@@ -259,19 +259,28 @@ public class Track : IDisposable {
   public void ToggleDisabled() {
     IsDisabled = !IsDisabled;
   }
+    // file i/o
 
-  // file i/o
-  private void SaveToTempFile() {
-    Directory.CreateDirectory(Path.GetDirectoryName(tempFilePath));
-    using var writer = new WaveFileWriter(tempFilePath, fileReader?.WaveFormat ?? new());
-    writer.WriteSamples(GetAdjustedSamples(), 0, samples.Length);
-  }
-  public void SaveToFile(string path) {
-    Directory.CreateDirectory(Path.GetDirectoryName(path));
-    using var writer = new WaveFileWriter(path, fileReader?.WaveFormat ?? new());
-    writer.WriteSamples(GetAdjustedSamples(), 0, samples.Length);
-  }
-  public float[] GetAdjustedSamples() {
+    // The audio format to write: the original file's format if we have one,
+    // otherwise the track's own format (generated/recorded tracks are mono 44.1 kHz)
+    private WaveFormat GetWaveFormat()
+    {
+        return fileReader?.WaveFormat ?? WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, channels);
+    }
+
+    private void SaveToTempFile()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(tempFilePath));
+        using var writer = new WaveFileWriter(tempFilePath, GetWaveFormat());
+        writer.WriteSamples(GetAdjustedSamples(), 0, samples.Length);
+    }
+    public void SaveToFile(string path)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path));
+        using var writer = new WaveFileWriter(path, GetWaveFormat());
+        writer.WriteSamples(GetAdjustedSamples(), 0, samples.Length);
+    }
+    public float[] GetAdjustedSamples() {
     float[] adjSamples = new float[samples.Length];
     for (int s = 0; s < samples.Length; s++) {
       adjSamples[s] = samples[s] * Volume;

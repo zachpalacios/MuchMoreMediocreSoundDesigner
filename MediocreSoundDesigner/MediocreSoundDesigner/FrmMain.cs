@@ -10,6 +10,18 @@ public partial class FrmMain : Form
     private readonly UndoManager undoManager = new();
     private UndoManager.Snapshot volumeSnapshot;
 
+    // Colors handed out to tracks in order (chosen to look good on a dark background)
+    private static readonly Color[] TrackColors =
+    {
+        Color.FromArgb(79, 195, 247),   // blue
+        Color.FromArgb(129, 199, 132),  // green
+        Color.FromArgb(255, 183, 77),   // orange
+        Color.FromArgb(186, 104, 200),  // purple
+        Color.FromArgb(240, 98, 146),   // pink
+        Color.FromArgb(77, 208, 225),   // cyan
+    };
+    private int nextColorIndex = 0;
+
     // ctor
     public FrmMain()
     {
@@ -38,6 +50,8 @@ public partial class FrmMain : Form
             }
             volumeSnapshot = null;
         };
+        lblPlayhead.Width = 2;       // thin playhead line
+        tmrUpdate.Interval = 15;     // update about 60 times a second
     }
     private void ApplySettings()
     {
@@ -186,6 +200,7 @@ public partial class FrmMain : Form
     private void menuGenRecord_Click(object sender, EventArgs e)
     {
         Track newTrack = new(new float[0]);
+        newTrack.Name = "Recording";
         CreateTrackPanel(newTrack);
         trackManager.AddTrack(newTrack);
         newTrack.PanDrawSamples.Invalidate();
@@ -209,6 +224,7 @@ public partial class FrmMain : Form
             samples[i] = rand.NextSingle() * 2.0f - 1.0f;
         }
         Track newTrack = new(samples);
+        newTrack.Name = "Noise";
         CreateTrackPanel(newTrack);
         trackManager.AddTrack(newTrack);
         UpdateSizes();
@@ -240,6 +256,7 @@ public partial class FrmMain : Form
             samples[i] = cur;
         }
         Track newTrack = new(samples);
+        newTrack.Name = "Gradient Noise";
         CreateTrackPanel(newTrack);
         trackManager.AddTrack(newTrack);
         UpdateSizes();
@@ -265,14 +282,17 @@ public partial class FrmMain : Form
 
     private void trkDrawTimescale_Scroll(object sender, EventArgs e)
     {
-        trackManager.DrawTimescale = trkDrawTimescale.Maximum - trkDrawTimescale.Value;
+        // Max + Min - Value so the zoom never reaches 0 (which would crash the drawing)
+        trackManager.DrawTimescale = trkDrawTimescale.Maximum + trkDrawTimescale.Minimum - trkDrawTimescale.Value;
         trackManager.RedrawAll();
     }
 
     // Helper methods
     private Panel CreateTrackPanel(Track track)
     {
-        Panel pan = new()
+        track.TrackColor = TrackColors[nextColorIndex++ % TrackColors.Length];
+
+        BufferedPanel pan = new()
         {
             BackColor = Settings.Color.TrackBg_Unselected,
             Width = panTracks.Width,
@@ -283,6 +303,7 @@ public partial class FrmMain : Form
         {
             trackManager.SelectTrack(track);
             SyncVolumeSlider();
+            trackManager.RedrawAll();   // so the selection border moves
         };
         pan.DoubleClick += (sender, e) =>
         {
@@ -292,6 +313,12 @@ public partial class FrmMain : Form
         pan.Paint += (sender, e) =>
         {
             track.DrawSamples(e.Graphics, trackManager.DrawTimescale);
+            if (trackManager.SelectedTrack == track)
+            {
+                // colored border around the selected track
+                using Pen border = new(track.TrackColor, 3);
+                e.Graphics.DrawRectangle(border, 1, 1, pan.Width - 3, pan.Height - 3);
+            }
         };
         panTracks.Controls.Add(pan);
         track.LinkPanels(pan, panTracks);
@@ -310,20 +337,41 @@ public partial class FrmMain : Form
 
         int top = 0;
         if (trackManager is null) return;
+        const int GAP = 4;   // space between tracks
         foreach (Track track in trackManager.Tracks)
         {
             track.PanDrawSamples.Left = 0;
             track.PanDrawSamples.Width = panTracks.Width;
-            track.PanDrawSamples.Height = (panTracks.Height / trackManager.Tracks.Count) - 1;
+            track.PanDrawSamples.Height = (panTracks.Height / trackManager.Tracks.Count) - GAP;
             track.PanDrawSamples.Top = top;
             track.PanDrawSamples.Invalidate();
-            top += track.PanDrawSamples.Height;
+            top += track.PanDrawSamples.Height + GAP;
         }
         trkDrawTimescale.Width = panTracks.Width;
         trkDrawTimescale.Left = PADDING;
         lblPlayhead.Left = 0;
         lblPlayhead.Height = panTracks.Height;
         lblPlayhead.BringToFront();
+        ZoomToFit();   // make the longest track fill the width
+    }
+
+    // Picks the zoom so the longest track exactly fills the width of the track area
+    private void ZoomToFit()
+    {
+        if (trackManager is null || trackManager.Tracks.Count == 0) return;
+
+        int longest = trackManager.Tracks.Max(t => t.SampleCount);
+        int width = Math.Max(1, panTracks.ClientSize.Width - 10);
+        int samplesPerPixel = Math.Max(1, (int)Math.Ceiling(longest / (double)width));
+
+        trackManager.DrawTimescale = samplesPerPixel;
+
+        // keep the zoom slider roughly in sync (very long files go past its range; that's fine)
+        trkDrawTimescale.Value = Math.Clamp(
+            trkDrawTimescale.Maximum + trkDrawTimescale.Minimum - samplesPerPixel,
+            trkDrawTimescale.Minimum, trkDrawTimescale.Maximum);
+
+        trackManager.RedrawAll();
     }
 
     private float? AskFadeDuration(string title)
@@ -625,6 +673,7 @@ public partial class FrmMain : Form
         }
 
         Track newTrack = new(samples);
+        newTrack.Name = $"Tone {frequency:0} Hz";
         CreateTrackPanel(newTrack);
         trackManager.AddTrack(newTrack);
         UpdateSizes();
@@ -698,5 +747,15 @@ public partial class FrmMain : Form
             return ((float)nudFrequency.Value, (float)nudDuration.Value);
         }
         return null;
+    }
+
+    // A Panel that draws off-screen first, so it doesn't flicker when redrawn
+    public class BufferedPanel : Panel
+    {
+        public BufferedPanel()
+        {
+            DoubleBuffered = true;
+            ResizeRedraw = true;
+        }
     }
 }

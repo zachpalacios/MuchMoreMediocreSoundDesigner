@@ -32,7 +32,13 @@ public class Track : IDisposable {
   public bool IsDisabled { get; private set; }
   public Panel PanDrawSamples { get; private set; }
   public float Volume { get; private set; }
-  private string tempFilePath => Path.Combine(Path.GetTempPath(), "MediocreSoundDesigner", "temp.wav");
+    public Color TrackColor { get; set; } = Color.DeepSkyBlue;  // waveform color
+    public string Name { get; set; } = "Track";                 // label shown on the track
+    public int SampleCount => samples.Length;                    // used for zoom-to-fit
+
+    private static readonly Font LabelFont = new("Segoe UI", 9f, FontStyle.Bold);
+
+    private string tempFilePath => Path.Combine(Path.GetTempPath(), "MediocreSoundDesigner", "temp.wav");
   public PlaybackState State => outputDevice?.PlaybackState ?? PlaybackState.Stopped;
 
   // ctor
@@ -46,6 +52,7 @@ public class Track : IDisposable {
     }
 
     this.file = file;
+    this.Name = Path.GetFileNameWithoutExtension(file);
     this.duration = fileReader.TotalTime;
     this.offset = 0;
     this.timeScale = 1.0f;
@@ -299,30 +306,60 @@ public class Track : IDisposable {
     DrawOffset += amount;
     DrawOffset = Math.Max(0, DrawOffset);
   }
-  public void DrawSamples(Graphics g, int drawTimescale) {
-    if (PanDrawSamples is null) {
-      return;
+    public void DrawSamples(Graphics g, int drawTimescale)
+    {
+        if (PanDrawSamples is null)
+        {
+            return;
+        }
+        drawTimescale = Math.Max(1, drawTimescale);   // never divide the track into 0-sample columns
+        this.drawTimescale = drawTimescale;
+
+        int width = PanDrawSamples.Width;
+        int mid = PanDrawSamples.Height / 2;
+        float halfHeight = PanDrawSamples.Height / 2f - 6;   // small margin top and bottom
+
+        // Only draw the strip of the panel that actually needs repainting (much faster)
+        RectangleF clip = g.ClipBounds;
+        int firstX = Math.Max(DrawOffset, (int)Math.Floor(clip.Left));
+        int lastX = Math.Min(width, (int)Math.Ceiling(clip.Right));
+
+        // center line
+        using (Pen centerPen = new(Color.FromArgb(50, Color.White)))
+        {
+            g.DrawLine(centerPen, (int)clip.Left, mid, lastX, mid);
+        }
+
+        if (samples != null && samples.Length > 0)
+        {
+            Color color = IsDisabled ? Settings.Color.TrackSamples_Disabled : TrackColor;
+            using Pen pen = new(color);
+
+            // One vertical line per pixel, from the lowest to the highest sample in that pixel's slice.
+            for (int x = firstX; x < lastX; x++)
+            {
+                long start = (long)(x - DrawOffset) * drawTimescale;
+                if (start >= samples.Length) break;
+                int end = (int)Math.Min(start + drawTimescale, samples.Length);
+                float min = 0f, max = 0f;
+                for (int i = (int)start; i < end; i++)
+                {
+                    float v = samples[i] * Volume;
+                    if (v < min) min = v;
+                    if (v > max) max = v;
+                }
+                int yTop = mid - (int)(Math.Clamp(max, -1f, 1f) * halfHeight);
+                int yBottom = mid - (int)(Math.Clamp(min, -1f, 1f) * halfHeight);
+                g.DrawLine(pen, x, yTop, x, Math.Max(yBottom, yTop + 1));
+            }
+
+            // track name in the top-left corner
+            TextRenderer.DrawText(g, Name, LabelFont, new Point(8, 6), color);
+        }
     }
 
-    this.drawTimescale = drawTimescale;
-    float heightAdj = PanDrawSamples.Height / 2;
-    if (samples != null && samples.Length > 0) {
-      int x = DrawOffset;
-      Pen pen = new(IsDisabled ? Settings.Color.TrackSamples_Disabled : Settings.Color.TrackSamples_Enabled);
-      List<Point> points = new();
-      for (int s = 0; s < samples.Length; s += drawTimescale) {
-        var sample = (int)(samples[s] * heightAdj * Volume);
-        points.Add(new(x, PanDrawSamples.Height / 2));
-        points.Add(new(x, PanDrawSamples.Height / 2 - sample));
-        x++;
-      }
-      g.DrawLines(pen, points.ToArray());
-      pen.Dispose();
-    }
-  }
-
-  // dispose
-  public void Dispose() {
+    // dispose
+    public void Dispose() {
     outputDevice?.Dispose();
     fileReader?.Dispose();
   }

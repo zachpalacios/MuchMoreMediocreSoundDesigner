@@ -451,7 +451,7 @@ public partial class FrmMain : Form
 
         track.PanDrawSamples.Invalidate();
     }
-    
+
     // Window to show all the keyboard shorcuts
     private void ShowKeyboardShortcuts()
     {
@@ -524,5 +524,25 @@ public partial class FrmMain : Form
     private void menuHelpShortcuts_Click(object sender, EventArgs e)
     {
         ShowKeyboardShortcuts();
+    }
+
+    // Normalizes the audio that's currently selected
+    private void menuEditNormalize_Click(object sender, EventArgs e)
+    {
+        // Get the track that's currently chosen
+        Track track = trackManager.SelectedTrack;
+
+        // Make sure the track has actually been chosen
+        if (track is null)
+        {
+            MessageBox.Show("Please select a track first.");
+            return;
+        }
+
+        // Normalize the selected track's audio samples
+        track.Normalize();
+
+        // Redraw the waveform to display the updated amplitude
+        track.PanDrawSamples.Invalidate();
     }
 }

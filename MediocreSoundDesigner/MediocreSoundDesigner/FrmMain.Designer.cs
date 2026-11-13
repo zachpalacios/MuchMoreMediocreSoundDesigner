@@ -50,20 +50,35 @@
             menuGenRecord = new ToolStripMenuItem();
             menuGenNoise = new ToolStripMenuItem();
             menuGenGradientNoise = new ToolStripMenuItem();
+            helpToolStripMenuItem = new ToolStripMenuItem();
+            menuHelpShortcuts = new ToolStripMenuItem();
             btnPlay = new Button();
             tmrUpdate = new System.Windows.Forms.Timer(components);
             sfdSaveFile = new SaveFileDialog();
             trkDrawTimescale = new TrackBar();
             colorDialog = new ColorDialog();
             volumeLbl = new Label();
-            helpToolStripMenuItem = new ToolStripMenuItem();
-            menuHelpShortcuts = new ToolStripMenuItem();
+            menuEditNormalize = new ToolStripMenuItem();
             trkVolume = new TrackBar();
+            ((System.ComponentModel.ISupportInitialize)trkVolume).BeginInit();
             panTracks.SuspendLayout();
             menu.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)trkDrawTimescale).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)trkVolume).BeginInit();
             SuspendLayout();
+            // 
+            // trkVolume
+            // 
+            trkVolume.BackColor = Color.DimGray;
+            trkVolume.Enabled = false;
+            trkVolume.Location = new Point(1065, 702);
+            trkVolume.Margin = new Padding(3, 2, 3, 2);
+            trkVolume.Maximum = 200;
+            trkVolume.Name = "trkVolume";
+            trkVolume.Size = new Size(325, 45);
+            trkVolume.TabIndex = 8;
+            trkVolume.TickFrequency = 25;
+            trkVolume.Value = 100;
+            trkVolume.Scroll += trkVolume_Scroll;
             // 
             // panTracks
             // 
@@ -118,27 +133,27 @@
             // menuFileOpen
             // 
             menuFileOpen.Name = "menuFileOpen";
-            menuFileOpen.Size = new Size(180, 22);
+            menuFileOpen.Size = new Size(125, 22);
             menuFileOpen.Text = "Open...";
             menuFileOpen.Click += menuFileOpen_Click;
             // 
             // menuFileSave
             // 
             menuFileSave.Name = "menuFileSave";
-            menuFileSave.Size = new Size(180, 22);
+            menuFileSave.Size = new Size(125, 22);
             menuFileSave.Text = "Save...";
             menuFileSave.Click += menuFileSave_Click;
             // 
             // menuFileSettings
             // 
             menuFileSettings.Name = "menuFileSettings";
-            menuFileSettings.Size = new Size(180, 22);
+            menuFileSettings.Size = new Size(125, 22);
             menuFileSettings.Text = "Settings...";
             menuFileSettings.Click += menuFileSettings_Click;
             // 
             // menuEdit
             // 
-            menuEdit.DropDownItems.AddRange(new ToolStripItem[] { menuEditFlip, menuEditReverse, menuEditVolume, menuEditEliminateSilence, menuEditFadeIn, menuEditFadeOut });
+            menuEdit.DropDownItems.AddRange(new ToolStripItem[] { menuEditFlip, menuEditReverse, menuEditVolume, menuEditEliminateSilence, menuEditFadeIn, menuEditFadeOut, menuEditNormalize });
             menuEdit.Name = "menuEdit";
             menuEdit.Size = new Size(39, 20);
             menuEdit.Text = "E&dit";
@@ -195,23 +210,37 @@
             // menuGenRecord
             // 
             menuGenRecord.Name = "menuGenRecord";
-            menuGenRecord.Size = new Size(180, 22);
+            menuGenRecord.Size = new Size(152, 22);
             menuGenRecord.Text = "Record...";
             menuGenRecord.Click += menuGenRecord_Click;
             // 
             // menuGenNoise
             // 
             menuGenNoise.Name = "menuGenNoise";
-            menuGenNoise.Size = new Size(180, 22);
+            menuGenNoise.Size = new Size(152, 22);
             menuGenNoise.Text = "Noise";
             menuGenNoise.Click += menuGenNoise_Click;
             // 
             // menuGenGradientNoise
             // 
             menuGenGradientNoise.Name = "menuGenGradientNoise";
-            menuGenGradientNoise.Size = new Size(180, 22);
+            menuGenGradientNoise.Size = new Size(152, 22);
             menuGenGradientNoise.Text = "Gradient Noise";
             menuGenGradientNoise.Click += menuGenGradientNoise_Click;
+            // 
+            // helpToolStripMenuItem
+            // 
+            helpToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { menuHelpShortcuts });
+            helpToolStripMenuItem.Name = "helpToolStripMenuItem";
+            helpToolStripMenuItem.Size = new Size(44, 20);
+            helpToolStripMenuItem.Text = "Help";
+            // 
+            // menuHelpShortcuts
+            // 
+            menuHelpShortcuts.Name = "menuHelpShortcuts";
+            menuHelpShortcuts.Size = new Size(186, 22);
+            menuHelpShortcuts.Text = "Keyboard Shortcuts...";
+            menuHelpShortcuts.Click += menuHelpShortcuts_Click;
             // 
             // btnPlay
             // 
@@ -262,33 +291,12 @@
             volumeLbl.TabIndex = 9;
             volumeLbl.Text = "Volume";
             // 
-            // trkVolume
+            // menuEditNormalize
             // 
-            trkVolume.BackColor = Color.DimGray;
-            trkVolume.Enabled = false;
-            trkVolume.Location = new Point(1065, 702);
-            trkVolume.Margin = new Padding(3, 2, 3, 2);
-            trkVolume.Maximum = 200;
-            trkVolume.Name = "trkVolume";
-            trkVolume.Size = new Size(325, 45);
-            trkVolume.TabIndex = 8;
-            trkVolume.TickFrequency = 25;
-            trkVolume.Value = 100;
-            trkVolume.Scroll += trkVolume_Scroll;
-            // 
-            // helpToolStripMenuItem
-            // 
-            helpToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { menuHelpShortcuts });
-            helpToolStripMenuItem.Name = "helpToolStripMenuItem";
-            helpToolStripMenuItem.Size = new Size(44, 20);
-            helpToolStripMenuItem.Text = "Help";
-            // 
-            // menuHelpShortcuts
-            // 
-            menuHelpShortcuts.Name = "menuHelpShortcuts";
-            menuHelpShortcuts.Size = new Size(186, 22);
-            menuHelpShortcuts.Text = "Keyboard Shortcuts...";
-            menuHelpShortcuts.Click += menuHelpShortcuts_Click;
+            menuEditNormalize.Name = "menuEditNormalize";
+            menuEditNormalize.Size = new Size(180, 22);
+            menuEditNormalize.Text = "Normalize Audio";
+            menuEditNormalize.Click += menuEditNormalize_Click;
             // 
             // FrmMain
             // 
@@ -308,11 +316,11 @@
             Name = "FrmMain";
             Text = "Mediocre Sound Designer";
             SizeChanged += FrmMain_SizeChanged;
+            ((System.ComponentModel.ISupportInitialize)trkVolume).EndInit();
             panTracks.ResumeLayout(false);
             menu.ResumeLayout(false);
             menu.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)trkDrawTimescale).EndInit();
-            ((System.ComponentModel.ISupportInitialize)trkVolume).EndInit();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -348,5 +356,6 @@
         private ToolStripMenuItem menuEditFadeOut;
         private ToolStripMenuItem helpToolStripMenuItem;
         private ToolStripMenuItem menuHelpShortcuts;
+        private ToolStripMenuItem menuEditNormalize;
     }
 }

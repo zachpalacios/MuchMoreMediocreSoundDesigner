@@ -1,4 +1,5 @@
 ﻿using NAudio.Wave;
+using System.Security.Permissions;
 
 namespace MediocreSoundDesigner;
 
@@ -93,6 +94,39 @@ public class Track : IDisposable {
       samples[i] *= -1;
     }
   }
+
+  // Normalize audio method
+  public void Normalize()
+    {
+        // Find the highest amplitude in the track
+        float maxAmplitude = 0;
+
+        for (int i = 0; i < samples.Length; i++)
+        {
+            float amplitude = Math.Abs(samples[i]);
+
+            if (amplitude > maxAmplitude)
+            {
+                maxAmplitude = amplitude;
+            }
+        }
+
+        // Do nothing if the track has no sound at all
+        if (maxAmplitude == 0)
+        {
+            return;
+        }
+
+        // Calculate the multiplier needed to reach peak amplitude
+        float multiplier = 1.0f / maxAmplitude;
+
+        // Apply the multiplier to every sample
+        for (int i = 0; i < samples.Length; i++)
+        {
+            samples[i] *= multiplier;
+        }
+    }
+
   // Fade in method
   public void FadeIn(float durationSeconds){
     if (durationSeconds <= 0 || sampleRate <= 0 || samples.Length == 0)

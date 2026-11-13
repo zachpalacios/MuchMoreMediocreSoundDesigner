@@ -584,4 +584,25 @@ public partial class FrmMain : Form
         SyncVolumeSlider();
         UpdateUndoMenu();
     }
+
+    // Normalize: scale the track so its loudest sample reaches full volume (undoable)
+    private void menuEditNormalize_Click(object sender, EventArgs e)
+    {
+        RunUndoable(t =>
+        {
+            float[] samples = t.CloneSamples();
+            float peak = 0f;
+            foreach (float sample in samples)
+            {
+                peak = Math.Max(peak, Math.Abs(sample));
+            }
+            if (peak == 0f) return; // silent track, nothing to do
+
+            for (int i = 0; i < samples.Length; i++)
+            {
+                samples[i] /= peak;
+            }
+            t.ReplaceSamples(samples);
+        });
+    }
 }

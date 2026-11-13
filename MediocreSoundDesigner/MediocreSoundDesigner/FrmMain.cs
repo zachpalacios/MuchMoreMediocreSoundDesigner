@@ -451,4 +451,78 @@ public partial class FrmMain : Form
 
         track.PanDrawSamples.Invalidate();
     }
+    
+    // Window to show all the keyboard shorcuts
+    private void ShowKeyboardShortcuts()
+    {
+        // Creating window and setting its appearance
+        using Form dialog = new Form
+        {
+            Text = "Keyboard Shortcuts",
+            Size = new Size(460, 430),
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            BackColor = Color.FromArgb(35, 35, 35),
+            ForeColor = Color.White
+        };
+        // Creating a list to show the shortcuts in two columns
+        ListView shortcuts = new ListView
+        {
+            View = View.Details,
+            FullRowSelect = true,
+            GridLines = true,
+            Location = new Point(20, 20),
+            Size = new Size(400, 180),
+            BackColor = Color.FromArgb(45, 45, 45),
+            ForeColor = Color.White
+        };
+        // Column headers to distinguish the actions from their designated shortcut
+        shortcuts.Columns.Add("Action", 260);
+        shortcuts.Columns.Add("Shortcut", 130);
+
+        // Storing the shortcuts we have available
+        string[,] shortcutData =
+        {
+            { "Open Audio File", "Ctrl + O" },
+            { "Save Audio File", "Ctrl + S" },
+            { "Play / Pause", "Space" },
+            { "Reverse Track", "Ctrl + R" },
+            { "Flip Track", "Ctrl + F" },
+            { "Shift Track Left", "Left Arrow" },
+            { "Shift Track Right", "Right Arrow" },
+            { "Delete Selected Track", "Delete" }
+        };
+
+        // Loop through the shortcuts and add each to the list
+        for (int i = 0; i < shortcutData.GetLength(0); i++)
+        {
+            ListViewItem item = new ListViewItem(shortcutData[i, 0]);
+            item.SubItems.Add(shortcutData[i, 1]);
+            shortcuts.Items.Add(item);
+        }
+
+        // Creating a button to close the shortcuts window
+        Button closeButton = new Button
+        {
+            Text = "Close",
+            Size = new Size(100, 35),
+            Location = new Point(320, 340),
+            DialogResult = DialogResult.OK,
+            BackColor = Color.DimGray,
+            ForeColor = Color.White
+        };
+
+        dialog.Controls.Add(shortcuts);
+        dialog.Controls.Add(closeButton);
+        dialog.AcceptButton = closeButton;
+        dialog.CancelButton = closeButton;
+
+        dialog.ShowDialog(this);
+    }
+    private void menuHelpShortcuts_Click(object sender, EventArgs e)
+    {
+        ShowKeyboardShortcuts();
+    }
 }

@@ -29,7 +29,7 @@
         private void InitializeComponent()
         {
             components = new System.ComponentModel.Container();
-            //TrackBar trkVolume;
+            TrackBar trkVolume;
             panTracks = new Panel();
             lblPlayhead = new Label();
             lblDebug = new Label();
@@ -44,6 +44,8 @@
             menuEditReverse = new ToolStripMenuItem();
             menuEditVolume = new ToolStripMenuItem();
             menuEditEliminateSilence = new ToolStripMenuItem();
+            menuEditFadeIn = new ToolStripMenuItem();
+            menuEditFadeOut = new ToolStripMenuItem();
             menuGen = new ToolStripMenuItem();
             menuGenRecord = new ToolStripMenuItem();
             menuGenNoise = new ToolStripMenuItem();
@@ -54,8 +56,8 @@
             trkDrawTimescale = new TrackBar();
             colorDialog = new ColorDialog();
             volumeLbl = new Label();
-            menuEditFadeIn = new ToolStripMenuItem();
-            menuEditFadeOut = new ToolStripMenuItem();
+            helpToolStripMenuItem = new ToolStripMenuItem();
+            menuHelpShortcuts = new ToolStripMenuItem();
             trkVolume = new TrackBar();
             panTracks.SuspendLayout();
             menu.SuspendLayout();
@@ -99,7 +101,7 @@
             // menu
             // 
             menu.ImageScalingSize = new Size(20, 20);
-            menu.Items.AddRange(new ToolStripItem[] { menuFile, menuEdit, menuGen });
+            menu.Items.AddRange(new ToolStripItem[] { menuFile, menuEdit, menuGen, helpToolStripMenuItem });
             menu.Location = new Point(0, 0);
             menu.Name = "menu";
             menu.Size = new Size(1604, 24);
@@ -169,6 +171,20 @@
             menuEditEliminateSilence.Text = "Eliminate Silence...";
             menuEditEliminateSilence.Click += menuEditEliminateSilence_Click;
             // 
+            // menuEditFadeIn
+            // 
+            menuEditFadeIn.Name = "menuEditFadeIn";
+            menuEditFadeIn.Size = new Size(180, 22);
+            menuEditFadeIn.Text = "Fade In...";
+            menuEditFadeIn.Click += menuEditFadeIn_Click;
+            // 
+            // menuEditFadeOut
+            // 
+            menuEditFadeOut.Name = "menuEditFadeOut";
+            menuEditFadeOut.Size = new Size(180, 22);
+            menuEditFadeOut.Text = "Fade Out...";
+            menuEditFadeOut.Click += menuEditFadeOut_Click;
+            // 
             // menuGen
             // 
             menuGen.DropDownItems.AddRange(new ToolStripItem[] { menuGenRecord, menuGenNoise, menuGenGradientNoise });
@@ -179,21 +195,21 @@
             // menuGenRecord
             // 
             menuGenRecord.Name = "menuGenRecord";
-            menuGenRecord.Size = new Size(152, 22);
+            menuGenRecord.Size = new Size(180, 22);
             menuGenRecord.Text = "Record...";
             menuGenRecord.Click += menuGenRecord_Click;
             // 
             // menuGenNoise
             // 
             menuGenNoise.Name = "menuGenNoise";
-            menuGenNoise.Size = new Size(152, 22);
+            menuGenNoise.Size = new Size(180, 22);
             menuGenNoise.Text = "Noise";
             menuGenNoise.Click += menuGenNoise_Click;
             // 
             // menuGenGradientNoise
             // 
             menuGenGradientNoise.Name = "menuGenGradientNoise";
-            menuGenGradientNoise.Size = new Size(152, 22);
+            menuGenGradientNoise.Size = new Size(180, 22);
             menuGenGradientNoise.Text = "Gradient Noise";
             menuGenGradientNoise.Click += menuGenGradientNoise_Click;
             // 
@@ -260,19 +276,19 @@
             trkVolume.Value = 100;
             trkVolume.Scroll += trkVolume_Scroll;
             // 
-            // menuEditFadeIn
+            // helpToolStripMenuItem
             // 
-            menuEditFadeIn.Name = "menuEditFadeIn";
-            menuEditFadeIn.Size = new Size(180, 22);
-            menuEditFadeIn.Text = "Fade In...";
-            menuEditFadeIn.Click += menuEditFadeIn_Click;
+            helpToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { menuHelpShortcuts });
+            helpToolStripMenuItem.Name = "helpToolStripMenuItem";
+            helpToolStripMenuItem.Size = new Size(44, 20);
+            helpToolStripMenuItem.Text = "Help";
             // 
-            // menuEditFadeOut
+            // menuHelpShortcuts
             // 
-            menuEditFadeOut.Name = "menuEditFadeOut";
-            menuEditFadeOut.Size = new Size(180, 22);
-            menuEditFadeOut.Text = "Fade Out...";
-            menuEditFadeOut.Click += menuEditFadeOut_Click;
+            menuHelpShortcuts.Name = "menuHelpShortcuts";
+            menuHelpShortcuts.Size = new Size(186, 22);
+            menuHelpShortcuts.Text = "Keyboard Shortcuts...";
+            menuHelpShortcuts.Click += menuHelpShortcuts_Click;
             // 
             // FrmMain
             // 
@@ -330,5 +346,7 @@
         private Label volumeLbl;
         private ToolStripMenuItem menuEditFadeIn;
         private ToolStripMenuItem menuEditFadeOut;
+        private ToolStripMenuItem helpToolStripMenuItem;
+        private ToolStripMenuItem menuHelpShortcuts;
     }
 }

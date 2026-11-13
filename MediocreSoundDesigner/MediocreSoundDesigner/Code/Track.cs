@@ -272,25 +272,26 @@ public class Track : IDisposable {
     {
         Directory.CreateDirectory(Path.GetDirectoryName(tempFilePath));
         using var writer = new WaveFileWriter(tempFilePath, GetWaveFormat());
-        writer.WriteSamples(GetAdjustedSamples(), 0, samples.Length);
+        float[] adjusted = GetAdjustedSamples();
+        writer.WriteSamples(adjusted, 0, adjusted.Length);
     }
     public void SaveToFile(string path)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path));
         using var writer = new WaveFileWriter(path, GetWaveFormat());
-        writer.WriteSamples(GetAdjustedSamples(), 0, samples.Length);
+        float[] adjusted = GetAdjustedSamples();
+        writer.WriteSamples(adjusted, 0, adjusted.Length);
     }
     public float[] GetAdjustedSamples() {
     float[] adjSamples = new float[samples.Length];
     for (int s = 0; s < samples.Length; s++) {
       adjSamples[s] = samples[s] * Volume;
     }
-    float[] deadSpace = new float[DrawOffset * drawTimescale];
-    for (int i = 0; i < DrawOffset; i++) {
-      deadSpace[i] = 0.0f;
-    }
+        int deadLength = DrawOffset * drawTimescale;
+        deadLength -= deadLength % channels;
+        float[] deadSpace = new float[deadLength];
 
-    return [.. deadSpace, .. adjSamples];
+        return [.. deadSpace, .. adjSamples];
   }
 
   // render

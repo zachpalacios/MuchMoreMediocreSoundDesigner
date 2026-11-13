@@ -29,7 +29,6 @@
         private void InitializeComponent()
         {
             components = new System.ComponentModel.Container();
-            TrackBar trkVolume;
             panTracks = new Panel();
             lblPlayhead = new Label();
             lblDebug = new Label();

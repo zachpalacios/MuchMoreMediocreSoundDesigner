@@ -605,4 +605,98 @@ public partial class FrmMain : Form
             t.ReplaceSamples(samples);
         });
     }
+
+    private void menuGenTone_Click(object sender, EventArgs e)
+    {
+        var settings = AskToneSettings();
+        if (settings is null) return;   // user clicked Cancel
+
+        float frequency = settings.Value.Frequency;
+        float seconds = settings.Value.Seconds;
+
+        const int SAMPLE_RATE = 44100;   // matches generated tracks in Track.cs
+        const float AMPLITUDE = 0.5f;    // half volume so it isn't too loud
+
+        int count = (int)(SAMPLE_RATE * seconds);
+        float[] samples = new float[count];
+        for (int i = 0; i < count; i++)
+        {
+            samples[i] = AMPLITUDE * MathF.Sin(2 * MathF.PI * frequency * i / SAMPLE_RATE);
+        }
+
+        Track newTrack = new(samples);
+        CreateTrackPanel(newTrack);
+        trackManager.AddTrack(newTrack);
+        UpdateSizes();
+        newTrack.PanDrawSamples.Invalidate();
+    }
+
+    // Dialog asking for frequency and duration; returns null if cancelled.
+    // Uses auto-sizing layout so nothing gets cut off with Windows display scaling.
+    private (float Frequency, float Seconds)? AskToneSettings()
+    {
+        using Form dialog = new Form
+        {
+            Text = "Generate Tone",
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            StartPosition = FormStartPosition.CenterParent,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Padding = new Padding(12)
+        };
+
+        FlowLayoutPanel layout = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink
+        };
+
+        Label lblFrequency = new Label { Text = "Frequency (Hz):", AutoSize = true };
+        NumericUpDown nudFrequency = new NumericUpDown
+        {
+            Width = 260,
+            Minimum = 20,
+            Maximum = 20000,
+            Value = 440,
+            Increment = 10
+        };
+
+        Label lblDuration = new Label { Text = "Duration (seconds):", AutoSize = true, Margin = new Padding(3, 12, 3, 3) };
+        NumericUpDown nudDuration = new NumericUpDown
+        {
+            Width = 260,
+            Minimum = 0.1m,
+            Maximum = 60,
+            Value = 2,
+            DecimalPlaces = 1,
+            Increment = 0.5m
+        };
+
+        FlowLayoutPanel buttons = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.LeftToRight,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Margin = new Padding(0, 16, 0, 0)
+        };
+        Button ok = new Button { Text = "Apply", AutoSize = true, DialogResult = DialogResult.OK };
+        Button cancel = new Button { Text = "Cancel", AutoSize = true, DialogResult = DialogResult.Cancel };
+        buttons.Controls.Add(ok);
+        buttons.Controls.Add(cancel);
+
+        layout.Controls.AddRange(new Control[] { lblFrequency, nudFrequency, lblDuration, nudDuration, buttons });
+        dialog.Controls.Add(layout);
+        dialog.AcceptButton = ok;
+        dialog.CancelButton = cancel;
+
+        if (dialog.ShowDialog(this) == DialogResult.OK)
+        {
+            return ((float)nudFrequency.Value, (float)nudDuration.Value);
+        }
+        return null;
+    }
 }

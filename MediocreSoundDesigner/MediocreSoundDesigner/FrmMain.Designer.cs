@@ -61,6 +61,7 @@
             trkDrawTimescale = new TrackBar();
             colorDialog = new ColorDialog();
             volumeLbl = new Label();
+            menuGenTone = new ToolStripMenuItem();
             ((System.ComponentModel.ISupportInitialize)trkVolume).BeginInit();
             panTracks.SuspendLayout();
             menu.SuspendLayout();
@@ -226,7 +227,7 @@
             //
             // menuGen
             //
-            menuGen.DropDownItems.AddRange(new ToolStripItem[] { menuGenRecord, menuGenNoise, menuGenGradientNoise });
+            menuGen.DropDownItems.AddRange(new ToolStripItem[] { menuGenRecord, menuGenNoise, menuGenGradientNoise, menuGenTone });
             menuGen.Name = "menuGen";
             menuGen.Size = new Size(66, 20);
             menuGen.Text = "&Generate";
@@ -251,6 +252,13 @@
             menuGenGradientNoise.Size = new Size(152, 22);
             menuGenGradientNoise.Text = "Gradient Noise";
             menuGenGradientNoise.Click += menuGenGradientNoise_Click;
+            // 
+            // menuGenTone
+            // 
+            menuGenTone.Name = "menuGenTone";
+            menuGenTone.Size = new Size(152, 22);
+            menuGenTone.Text = "Tone...";
+            menuGenTone.Click += menuGenTone_Click;
             //
             // helpToolStripMenuItem
             //
@@ -376,6 +384,6 @@
         private ToolStripMenuItem menuEditUndo;
         private ToolStripMenuItem menuEditRedo;
         private ToolStripMenuItem menuEditNormalize;
+        private ToolStripMenuItem menuGenTone;
     }
 }
-

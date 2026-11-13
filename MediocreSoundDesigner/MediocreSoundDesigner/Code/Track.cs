@@ -17,6 +17,7 @@ public class Track : IDisposable {
   private float timeScale;
   private int sampleRate;
   private float[] samples;
+  public float[] GetSamplesCopy() => (float[])samples.Clone();
   private float pitch;
   private int bits;
   private int channels;

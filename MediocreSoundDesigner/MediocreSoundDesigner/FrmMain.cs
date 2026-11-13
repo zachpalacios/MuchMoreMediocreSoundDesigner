@@ -7,6 +7,8 @@ public partial class FrmMain : Form
 {
     // fields
     private TrackManager trackManager;
+    private readonly UndoManager undoManager = new();
+    private UndoManager.Snapshot volumeSnapshot;
 
     // ctor
     public FrmMain()
@@ -25,6 +27,17 @@ public partial class FrmMain : Form
         UpdateSizes();
         ApplySettings();
         SyncVolumeSlider();
+        UpdateUndoMenu();
+        trkVolume.MouseDown += (s, e) => volumeSnapshot = undoManager.Capture(trackManager.SelectedTrack);
+        trkVolume.MouseUp += (s, e) =>
+        {
+            if (volumeSnapshot is not null && volumeSnapshot.Volume != trackManager.SelectedTrack?.Volume)
+            {
+                undoManager.Push(volumeSnapshot);
+                UpdateUndoMenu();
+            }
+            volumeSnapshot = null;
+        };
     }
     private void ApplySettings()
     {
@@ -74,14 +87,12 @@ public partial class FrmMain : Form
         {
             if (keyData == Keys.Left)
             {
-                trackManager.SelectedTrack.ShiftSampleOver(-5);
-                trackManager.SelectedTrack.PanDrawSamples.Invalidate();
+                RunUndoable(t => t.ShiftSampleOver(-5));
                 return true;
             }
             else if (keyData == Keys.Right)
             {
-                trackManager.SelectedTrack.ShiftSampleOver(+5);
-                trackManager.SelectedTrack.PanDrawSamples.Invalidate();
+                RunUndoable(t => t.ShiftSampleOver(+5));
                 return true;
             }
             else if (keyData == Keys.Delete)
@@ -91,6 +102,8 @@ public partial class FrmMain : Form
                     if (MessageBox.Show("This will delete the selected track. This is NOT undoable!", "Are You Sure?", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Exclamation) == DialogResult.Yes)
                     {
                         panTracks.Controls.Remove(trackManager.SelectedTrack.PanDrawSamples);
+                        undoManager.Forget(trackManager.SelectedTrack);
+                        UpdateUndoMenu();
                         trackManager.SelectedTrack.PanDrawSamples.Dispose();
                         trackManager.SelectedTrack.Dispose();
                         trackManager.RemTrack(trackManager.SelectedTrack);
@@ -155,29 +168,19 @@ public partial class FrmMain : Form
 
     private void menuEditFlip_Click(object sender, EventArgs e)
     {
-        trackManager.SelectedTrack?.Flip();
+        RunUndoable(t => t.Flip());
     }
     private void menuEditReverse_Click(object sender, EventArgs e)
     {
-        trackManager.SelectedTrack?.Reverse();
+        RunUndoable(t => t.Reverse());
     }
     private void menuEditVolume_Click(object sender, EventArgs e)
     {
-        if (trackManager.SelectedTrack is not null)
-        {
-            FrmEditVolume frm = new();
-            frm.SetSound(trackManager.SelectedTrack);
-            frm.ShowDialog();
-        }
+        ShowEditDialog(new FrmEditVolume());
     }
     private void menuEditEliminateSilence_Click(object sender, EventArgs e)
     {
-        if (trackManager.SelectedTrack is not null)
-        {
-            FrmEditEliminateSilence frm = new();
-            frm.SetSound(trackManager.SelectedTrack);
-            frm.ShowDialog();
-        }
+        ShowEditDialog(new FrmEditEliminateSilence());
     }
 
     private void menuGenRecord_Click(object sender, EventArgs e)
@@ -426,10 +429,12 @@ public partial class FrmMain : Form
         if (duration is null)
             return;
 
+        undoManager.Record(track);
         track.FadeIn(duration.Value);
 
         // Refresh the waveform after modifying the samples
         track.PanDrawSamples.Invalidate();
+        UpdateUndoMenu();
     }
 
     private void menuEditFadeOut_Click(object sender, EventArgs e)
@@ -447,11 +452,13 @@ public partial class FrmMain : Form
         if (duration is null)
             return;
 
+        undoManager.Record(track);
         track.FadeOut(duration.Value);
 
         track.PanDrawSamples.Invalidate();
+        UpdateUndoMenu();
     }
-    
+
     // Window to show all the keyboard shorcuts
     private void ShowKeyboardShortcuts()
     {
@@ -474,7 +481,7 @@ public partial class FrmMain : Form
             FullRowSelect = true,
             GridLines = true,
             Location = new Point(20, 20),
-            Size = new Size(400, 180),
+            Size = new Size(400, 230),
             BackColor = Color.FromArgb(45, 45, 45),
             ForeColor = Color.White
         };
@@ -492,7 +499,9 @@ public partial class FrmMain : Form
             { "Flip Track", "Ctrl + F" },
             { "Shift Track Left", "Left Arrow" },
             { "Shift Track Right", "Right Arrow" },
-            { "Delete Selected Track", "Delete" }
+            { "Delete Selected Track", "Delete" },
+            { "Undo", "Ctrl + Z" },
+            { "Redo", "Ctrl + Y" }
         };
 
         // Loop through the shortcuts and add each to the list
@@ -524,5 +533,55 @@ public partial class FrmMain : Form
     private void menuHelpShortcuts_Click(object sender, EventArgs e)
     {
         ShowKeyboardShortcuts();
+    }
+
+    // Runs an instant edit on the selected track and saves an undo step first
+    private void RunUndoable(Action<Track> edit)
+    {
+        Track track = trackManager.SelectedTrack;
+        if (track is null) return;
+        undoManager.Record(track);
+        edit(track);
+        track.PanDrawSamples.Invalidate();
+        UpdateUndoMenu();
+    }
+
+    // Shows an edit dialog; only saves an undo step if the user clicks Apply
+    private void ShowEditDialog(FrmEditMaster frm)
+    {
+        Track track = trackManager.SelectedTrack;
+        if (track is null) return;
+        using (frm)
+        {
+            var before = undoManager.Capture(track);
+            frm.SetSound(track);
+            if (frm.ShowDialog(this) == DialogResult.OK)
+            {
+                undoManager.Push(before);
+                UpdateUndoMenu();
+                SyncVolumeSlider();
+            }
+        }
+    }
+
+    // Greys out Undo/Redo in the menu when there's nothing to undo/redo
+    private void UpdateUndoMenu()
+    {
+        menuEditUndo.Enabled = undoManager.CanUndo;
+        menuEditRedo.Enabled = undoManager.CanRedo;
+    }
+
+    private void menuEditUndo_Click(object sender, EventArgs e)
+    {
+        undoManager.Undo();
+        SyncVolumeSlider();
+        UpdateUndoMenu();
+    }
+
+    private void menuEditRedo_Click(object sender, EventArgs e)
+    {
+        undoManager.Redo();
+        SyncVolumeSlider();
+        UpdateUndoMenu();
     }
 }

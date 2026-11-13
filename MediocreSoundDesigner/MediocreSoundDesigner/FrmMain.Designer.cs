@@ -29,7 +29,7 @@
         private void InitializeComponent()
         {
             components = new System.ComponentModel.Container();
-            TrackBar trkVolume;
+            trkVolume = new TrackBar();
             panTracks = new Panel();
             lblPlayhead = new Label();
             lblDebug = new Label();
@@ -40,6 +40,8 @@
             menuFileSave = new ToolStripMenuItem();
             menuFileSettings = new ToolStripMenuItem();
             menuEdit = new ToolStripMenuItem();
+            menuEditUndo = new ToolStripMenuItem();
+            menuEditRedo = new ToolStripMenuItem();
             menuEditFlip = new ToolStripMenuItem();
             menuEditReverse = new ToolStripMenuItem();
             menuEditVolume = new ToolStripMenuItem();
@@ -50,20 +52,33 @@
             menuGenRecord = new ToolStripMenuItem();
             menuGenNoise = new ToolStripMenuItem();
             menuGenGradientNoise = new ToolStripMenuItem();
+            helpToolStripMenuItem = new ToolStripMenuItem();
+            menuHelpShortcuts = new ToolStripMenuItem();
             btnPlay = new Button();
             tmrUpdate = new System.Windows.Forms.Timer(components);
             sfdSaveFile = new SaveFileDialog();
             trkDrawTimescale = new TrackBar();
             colorDialog = new ColorDialog();
             volumeLbl = new Label();
-            helpToolStripMenuItem = new ToolStripMenuItem();
-            menuHelpShortcuts = new ToolStripMenuItem();
-            trkVolume = new TrackBar();
+            ((System.ComponentModel.ISupportInitialize)trkVolume).BeginInit();
             panTracks.SuspendLayout();
             menu.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)trkDrawTimescale).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)trkVolume).BeginInit();
             SuspendLayout();
+            // 
+            // trkVolume
+            // 
+            trkVolume.BackColor = Color.DimGray;
+            trkVolume.Enabled = false;
+            trkVolume.Location = new Point(1521, 1170);
+            trkVolume.Margin = new Padding(4, 3, 4, 3);
+            trkVolume.Maximum = 200;
+            trkVolume.Name = "trkVolume";
+            trkVolume.Size = new Size(464, 69);
+            trkVolume.TabIndex = 8;
+            trkVolume.TickFrequency = 25;
+            trkVolume.Value = 100;
+            trkVolume.Scroll += trkVolume_Scroll;
             // 
             // panTracks
             // 
@@ -71,17 +86,19 @@
             panTracks.BackColor = Color.DimGray;
             panTracks.BorderStyle = BorderStyle.Fixed3D;
             panTracks.Controls.Add(lblPlayhead);
-            panTracks.Location = new Point(10, 102);
+            panTracks.Location = new Point(14, 170);
+            panTracks.Margin = new Padding(4, 5, 4, 5);
             panTracks.Name = "panTracks";
-            panTracks.Size = new Size(1580, 541);
+            panTracks.Size = new Size(2255, 899);
             panTracks.TabIndex = 0;
             // 
             // lblPlayhead
             // 
             lblPlayhead.BackColor = Color.White;
-            lblPlayhead.Location = new Point(39, -2);
+            lblPlayhead.Location = new Point(56, -3);
+            lblPlayhead.Margin = new Padding(4, 0, 4, 0);
             lblPlayhead.Name = "lblPlayhead";
-            lblPlayhead.Size = new Size(5, 385);
+            lblPlayhead.Size = new Size(7, 642);
             lblPlayhead.TabIndex = 9;
             // 
             // lblDebug
@@ -89,9 +106,10 @@
             lblDebug.Dock = DockStyle.Bottom;
             lblDebug.Font = new Font("Segoe UI", 20.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
             lblDebug.ForeColor = Color.FromArgb(255, 255, 192);
-            lblDebug.Location = new Point(0, 746);
+            lblDebug.Location = new Point(0, 1243);
+            lblDebug.Margin = new Padding(4, 0, 4, 0);
             lblDebug.Name = "lblDebug";
-            lblDebug.Size = new Size(1604, 37);
+            lblDebug.Size = new Size(2291, 62);
             lblDebug.TabIndex = 1;
             // 
             // ofdLoadFile
@@ -104,7 +122,8 @@
             menu.Items.AddRange(new ToolStripItem[] { menuFile, menuEdit, menuGen, helpToolStripMenuItem });
             menu.Location = new Point(0, 0);
             menu.Name = "menu";
-            menu.Size = new Size(1604, 24);
+            menu.Padding = new Padding(9, 3, 0, 3);
+            menu.Size = new Size(2291, 35);
             menu.TabIndex = 5;
             menu.Text = "menuStrip1";
             // 
@@ -112,76 +131,92 @@
             // 
             menuFile.DropDownItems.AddRange(new ToolStripItem[] { menuFileOpen, menuFileSave, menuFileSettings });
             menuFile.Name = "menuFile";
-            menuFile.Size = new Size(37, 20);
+            menuFile.Size = new Size(54, 29);
             menuFile.Text = "&File";
             // 
             // menuFileOpen
             // 
             menuFileOpen.Name = "menuFileOpen";
-            menuFileOpen.Size = new Size(180, 22);
+            menuFileOpen.Size = new Size(190, 34);
             menuFileOpen.Text = "Open...";
             menuFileOpen.Click += menuFileOpen_Click;
             // 
             // menuFileSave
             // 
             menuFileSave.Name = "menuFileSave";
-            menuFileSave.Size = new Size(180, 22);
+            menuFileSave.Size = new Size(190, 34);
             menuFileSave.Text = "Save...";
             menuFileSave.Click += menuFileSave_Click;
             // 
             // menuFileSettings
             // 
             menuFileSettings.Name = "menuFileSettings";
-            menuFileSettings.Size = new Size(180, 22);
+            menuFileSettings.Size = new Size(190, 34);
             menuFileSettings.Text = "Settings...";
             menuFileSettings.Click += menuFileSettings_Click;
             // 
             // menuEdit
             // 
-            menuEdit.DropDownItems.AddRange(new ToolStripItem[] { menuEditFlip, menuEditReverse, menuEditVolume, menuEditEliminateSilence, menuEditFadeIn, menuEditFadeOut });
+            menuEdit.DropDownItems.AddRange(new ToolStripItem[] { menuEditUndo, menuEditRedo, menuEditFlip, menuEditReverse, menuEditVolume, menuEditEliminateSilence, menuEditFadeIn, menuEditFadeOut });
             menuEdit.Name = "menuEdit";
-            menuEdit.Size = new Size(39, 20);
+            menuEdit.Size = new Size(58, 29);
             menuEdit.Text = "E&dit";
+            // 
+            // menuEditUndo
+            // 
+            menuEditUndo.Name = "menuEditUndo";
+            menuEditUndo.ShortcutKeys = Keys.Control | Keys.Z;
+            menuEditUndo.Size = new Size(270, 34);
+            menuEditUndo.Text = "Undo";
+            menuEditUndo.Click += menuEditUndo_Click;
+            // 
+            // menuEditRedo
+            // 
+            menuEditRedo.Name = "menuEditRedo";
+            menuEditRedo.ShortcutKeys = Keys.Control | Keys.Y;
+            menuEditRedo.Size = new Size(270, 34);
+            menuEditRedo.Text = "Redo";
+            menuEditRedo.Click += menuEditRedo_Click;
             // 
             // menuEditFlip
             // 
             menuEditFlip.Name = "menuEditFlip";
-            menuEditFlip.Size = new Size(180, 22);
+            menuEditFlip.Size = new Size(270, 34);
             menuEditFlip.Text = "Flip";
             menuEditFlip.Click += menuEditFlip_Click;
             // 
             // menuEditReverse
             // 
             menuEditReverse.Name = "menuEditReverse";
-            menuEditReverse.Size = new Size(180, 22);
+            menuEditReverse.Size = new Size(270, 34);
             menuEditReverse.Text = "Reverse";
             menuEditReverse.Click += menuEditReverse_Click;
             // 
             // menuEditVolume
             // 
             menuEditVolume.Name = "menuEditVolume";
-            menuEditVolume.Size = new Size(180, 22);
+            menuEditVolume.Size = new Size(270, 34);
             menuEditVolume.Text = "Alter Volume...";
             menuEditVolume.Click += menuEditVolume_Click;
             // 
             // menuEditEliminateSilence
             // 
             menuEditEliminateSilence.Name = "menuEditEliminateSilence";
-            menuEditEliminateSilence.Size = new Size(180, 22);
+            menuEditEliminateSilence.Size = new Size(270, 34);
             menuEditEliminateSilence.Text = "Eliminate Silence...";
             menuEditEliminateSilence.Click += menuEditEliminateSilence_Click;
             // 
             // menuEditFadeIn
             // 
             menuEditFadeIn.Name = "menuEditFadeIn";
-            menuEditFadeIn.Size = new Size(180, 22);
+            menuEditFadeIn.Size = new Size(270, 34);
             menuEditFadeIn.Text = "Fade In...";
             menuEditFadeIn.Click += menuEditFadeIn_Click;
             // 
             // menuEditFadeOut
             // 
             menuEditFadeOut.Name = "menuEditFadeOut";
-            menuEditFadeOut.Size = new Size(180, 22);
+            menuEditFadeOut.Size = new Size(270, 34);
             menuEditFadeOut.Text = "Fade Out...";
             menuEditFadeOut.Click += menuEditFadeOut_Click;
             // 
@@ -189,29 +224,43 @@
             // 
             menuGen.DropDownItems.AddRange(new ToolStripItem[] { menuGenRecord, menuGenNoise, menuGenGradientNoise });
             menuGen.Name = "menuGen";
-            menuGen.Size = new Size(66, 20);
+            menuGen.Size = new Size(98, 29);
             menuGen.Text = "&Generate";
             // 
             // menuGenRecord
             // 
             menuGenRecord.Name = "menuGenRecord";
-            menuGenRecord.Size = new Size(180, 22);
+            menuGenRecord.Size = new Size(231, 34);
             menuGenRecord.Text = "Record...";
             menuGenRecord.Click += menuGenRecord_Click;
             // 
             // menuGenNoise
             // 
             menuGenNoise.Name = "menuGenNoise";
-            menuGenNoise.Size = new Size(180, 22);
+            menuGenNoise.Size = new Size(231, 34);
             menuGenNoise.Text = "Noise";
             menuGenNoise.Click += menuGenNoise_Click;
             // 
             // menuGenGradientNoise
             // 
             menuGenGradientNoise.Name = "menuGenGradientNoise";
-            menuGenGradientNoise.Size = new Size(180, 22);
+            menuGenGradientNoise.Size = new Size(231, 34);
             menuGenGradientNoise.Text = "Gradient Noise";
             menuGenGradientNoise.Click += menuGenGradientNoise_Click;
+            // 
+            // helpToolStripMenuItem
+            // 
+            helpToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { menuHelpShortcuts });
+            helpToolStripMenuItem.Name = "helpToolStripMenuItem";
+            helpToolStripMenuItem.Size = new Size(65, 29);
+            helpToolStripMenuItem.Text = "Help";
+            // 
+            // menuHelpShortcuts
+            // 
+            menuHelpShortcuts.Name = "menuHelpShortcuts";
+            menuHelpShortcuts.Size = new Size(282, 34);
+            menuHelpShortcuts.Text = "Keyboard Shortcuts...";
+            menuHelpShortcuts.Click += menuHelpShortcuts_Click;
             // 
             // btnPlay
             // 
@@ -224,9 +273,10 @@
             btnPlay.FlatAppearance.MouseOverBackColor = Color.Transparent;
             btnPlay.FlatStyle = FlatStyle.Flat;
             btnPlay.Font = new Font("Segoe UI", 15.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            btnPlay.Location = new Point(717, 661);
+            btnPlay.Location = new Point(1024, 1102);
+            btnPlay.Margin = new Padding(4, 5, 4, 5);
             btnPlay.Name = "btnPlay";
-            btnPlay.Size = new Size(100, 100);
+            btnPlay.Size = new Size(143, 167);
             btnPlay.TabIndex = 6;
             btnPlay.UseVisualStyleBackColor = false;
             btnPlay.Click += btnPlay_Click;
@@ -240,11 +290,12 @@
             // trkDrawTimescale
             // 
             trkDrawTimescale.LargeChange = 50;
-            trkDrawTimescale.Location = new Point(12, 55);
+            trkDrawTimescale.Location = new Point(17, 92);
+            trkDrawTimescale.Margin = new Padding(4, 5, 4, 5);
             trkDrawTimescale.Maximum = 1000;
             trkDrawTimescale.Minimum = 1;
             trkDrawTimescale.Name = "trkDrawTimescale";
-            trkDrawTimescale.Size = new Size(1580, 45);
+            trkDrawTimescale.Size = new Size(2257, 69);
             trkDrawTimescale.SmallChange = 10;
             trkDrawTimescale.TabIndex = 7;
             trkDrawTimescale.TickFrequency = 10;
@@ -256,46 +307,19 @@
             volumeLbl.AutoSize = true;
             volumeLbl.Font = new Font("Segoe UI", 12F, FontStyle.Regular, GraphicsUnit.Point, 0);
             volumeLbl.ForeColor = SystemColors.ButtonHighlight;
-            volumeLbl.Location = new Point(1189, 746);
+            volumeLbl.Location = new Point(1699, 1243);
+            volumeLbl.Margin = new Padding(4, 0, 4, 0);
             volumeLbl.Name = "volumeLbl";
-            volumeLbl.Size = new Size(63, 21);
+            volumeLbl.Size = new Size(95, 32);
             volumeLbl.TabIndex = 9;
             volumeLbl.Text = "Volume";
             // 
-            // trkVolume
-            // 
-            trkVolume.BackColor = Color.DimGray;
-            trkVolume.Enabled = false;
-            trkVolume.Location = new Point(1065, 702);
-            trkVolume.Margin = new Padding(3, 2, 3, 2);
-            trkVolume.Maximum = 200;
-            trkVolume.Name = "trkVolume";
-            trkVolume.Size = new Size(325, 45);
-            trkVolume.TabIndex = 8;
-            trkVolume.TickFrequency = 25;
-            trkVolume.Value = 100;
-            trkVolume.Scroll += trkVolume_Scroll;
-            // 
-            // helpToolStripMenuItem
-            // 
-            helpToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { menuHelpShortcuts });
-            helpToolStripMenuItem.Name = "helpToolStripMenuItem";
-            helpToolStripMenuItem.Size = new Size(44, 20);
-            helpToolStripMenuItem.Text = "Help";
-            // 
-            // menuHelpShortcuts
-            // 
-            menuHelpShortcuts.Name = "menuHelpShortcuts";
-            menuHelpShortcuts.Size = new Size(186, 22);
-            menuHelpShortcuts.Text = "Keyboard Shortcuts...";
-            menuHelpShortcuts.Click += menuHelpShortcuts_Click;
-            // 
             // FrmMain
             // 
-            AutoScaleDimensions = new SizeF(7F, 15F);
+            AutoScaleDimensions = new SizeF(10F, 25F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.Black;
-            ClientSize = new Size(1604, 783);
+            ClientSize = new Size(2291, 1305);
             Controls.Add(volumeLbl);
             Controls.Add(trkVolume);
             Controls.Add(trkDrawTimescale);
@@ -305,14 +329,15 @@
             Controls.Add(menu);
             KeyPreview = true;
             MainMenuStrip = menu;
+            Margin = new Padding(4, 5, 4, 5);
             Name = "FrmMain";
             Text = "Mediocre Sound Designer";
             SizeChanged += FrmMain_SizeChanged;
+            ((System.ComponentModel.ISupportInitialize)trkVolume).EndInit();
             panTracks.ResumeLayout(false);
             menu.ResumeLayout(false);
             menu.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)trkDrawTimescale).EndInit();
-            ((System.ComponentModel.ISupportInitialize)trkVolume).EndInit();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -348,5 +373,7 @@
         private ToolStripMenuItem menuEditFadeOut;
         private ToolStripMenuItem helpToolStripMenuItem;
         private ToolStripMenuItem menuHelpShortcuts;
+        private ToolStripMenuItem menuEditUndo;
+        private ToolStripMenuItem menuEditRedo;
     }
 }

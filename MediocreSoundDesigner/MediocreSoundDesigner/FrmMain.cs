@@ -465,11 +465,12 @@ public partial class FrmMain : Form
     private void UpdateSizes()
     {
         const int PADDING = 15;
+        const int GAP = 4;
 
         panTracks.Left = PADDING;
         panTracks.Width = ClientSize.Width - (PADDING * 2);
 
-        // Make room for the toolbar if it overlaps the zoom slider (e.g. at high display scaling)
+        // Keep the toolbar from overlapping the zoom slider
         if (toolbar != null && trkDrawTimescale.Top < toolbar.Bottom + 2)
         {
             int shift = toolbar.Bottom + 2 - trkDrawTimescale.Top;
@@ -478,32 +479,73 @@ public partial class FrmMain : Form
             panTracks.Height -= shift;
         }
 
-        if (trackManager is null) return;
-        const int GAP = 4;   // space between tracks
+        if (trackManager is null)
+            return;
+
         int count = Math.Max(1, trackManager.Tracks.Count);
 
-        // Fixed heights scroll when they don't fit; "Fit" squeezes all tracks into the window
+        // Calculate the height of each track
         int height = trackHeight > 0 ? trackHeight : (panTracks.ClientSize.Height / count) - GAP;
-        bool scrolling = trackHeight > 0 && count * (height + GAP) > panTracks.ClientSize.Height;
-        int width = panTracks.ClientSize.Width - (scrolling ? SystemInformation.VerticalScrollBarWidth : 0);
 
-        int top = panTracks.AutoScrollPosition.Y;   // account for the current scroll position
+        height = Math.Max(20, height);
+
+        // Determine how wide the full audio timeline needs to be
+        int visibleWidth = panTracks.ClientSize.Width;
+
+        int timelineWidth = visibleWidth;
+
+        foreach (Track track in trackManager.Tracks)
+        {
+            int trackWidth = (int)Math.Min(
+                int.MaxValue - 100L,
+                (long)Math.Ceiling(
+                    track.SampleCount /
+                    (double)Math.Max(1, trackManager.DrawTimescale)
+                ) + track.DrawOffset + 10L
+            );
+
+            timelineWidth = Math.Max(timelineWidth, trackWidth);
+        }
+
+        // Keep the current scroll position
+        int scrollX = -panTracks.AutoScrollPosition.X;
+        int scrollY = -panTracks.AutoScrollPosition.Y;
+
+        panTracks.SuspendLayout();
+
+        // Size each track to the complete timeline
+        int top = 0;
+
         foreach (Track track in trackManager.Tracks)
         {
             track.PanDrawSamples.Left = 0;
-            track.PanDrawSamples.Width = width;
-            track.PanDrawSamples.Height = Math.Max(20, height);
             track.PanDrawSamples.Top = top;
-            track.PanDrawSamples.Invalidate();
-            top += track.PanDrawSamples.Height + GAP;
+            track.PanDrawSamples.Width = timelineWidth;
+            track.PanDrawSamples.Height = height;
+
+            top += height + GAP;
         }
+
+        // Set the total scrollable area
+        panTracks.AutoScrollMinSize = new Size(timelineWidth, Math.Max(panTracks.ClientSize.Height, top));
+
+        // Keep the playhead aligned with the waveform
+        lblPlayhead.Top = 0;
+        lblPlayhead.Height = Math.Max(panTracks.ClientSize.Height, top);
+
+        lblPlayhead.Left = trackManager.GetPlayheadPos();
+        lblPlayhead.BringToFront();
+
+        panTracks.ResumeLayout(true);
+
+        // Restore the scroll position where possible
+        panTracks.AutoScrollPosition = new Point(scrollX, scrollY);
+
+        // Update the zoom slider dimensions
         trkDrawTimescale.Width = panTracks.Width;
         trkDrawTimescale.Left = PADDING;
-        lblPlayhead.Left = 0;
-        lblPlayhead.Top = panTracks.AutoScrollPosition.Y;
-        lblPlayhead.Height = Math.Max(panTracks.ClientSize.Height, top - panTracks.AutoScrollPosition.Y);
-        lblPlayhead.BringToFront();
-        ZoomToFit();   // make the longest track fill the width
+
+        trackManager.RedrawAll();
     }
 
     // Picks the zoom so the longest track exactly fills the width of the track area

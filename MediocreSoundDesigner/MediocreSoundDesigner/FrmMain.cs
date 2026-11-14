@@ -364,8 +364,14 @@ public partial class FrmMain : Form
                 btnPlay.Invalidate();   // redraw as play or pause
             }
             btnPlay.Visible = true;
-            lblPlayhead.Left = trackManager.GetPlayheadPos();
+            // Get the current position of the playhead
+            int playheadX = trackManager.GetPlayheadPos();
+            // Get the current horizontal scroll position
+            int scrollX = -panTracks.AutoScrollPosition.X;
+            // Convert the timeline position to the visible panel position
+            lblPlayhead.Left = playheadX - scrollX;
             lblPlayhead.Visible = true;
+            lblPlayhead.BringToFront();
         }
         else
         {
@@ -395,6 +401,16 @@ public partial class FrmMain : Form
         // Max + Min - Value so the zoom never reaches 0 (which would crash the drawing)
         trackManager.DrawTimescale = trkDrawTimescale.Maximum + trkDrawTimescale.Minimum - trkDrawTimescale.Value;
         UpdateSizes();
+
+        // Get the current playhead position using the new zoom level
+        int playheadX = trackManager.GetPlayheadPos();
+
+        // Account for the current horizontal scroll position
+        int scrollX = -panTracks.AutoScrollPosition.X;
+
+        // Reposition the playhead without changeing the playback time
+        lblPlayhead.Left = playheadX - scrollX;
+        lblPlayhead.BringToFront();
     }
 
     // Helper methods

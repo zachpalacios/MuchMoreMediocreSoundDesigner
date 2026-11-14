@@ -394,7 +394,7 @@ public partial class FrmMain : Form
     {
         // Max + Min - Value so the zoom never reaches 0 (which would crash the drawing)
         trackManager.DrawTimescale = trkDrawTimescale.Maximum + trkDrawTimescale.Minimum - trkDrawTimescale.Value;
-        trackManager.RedrawAll();
+        UpdateSizes();
     }
 
     // Helper methods
@@ -559,7 +559,7 @@ public partial class FrmMain : Form
 
         trackManager.DrawTimescale = samplesPerPixel;
         SyncZoomSlider();
-        trackManager.RedrawAll();
+        UpdateSizes();
     }
 
     // Zoom in (factor < 1) or out (factor > 1) from the current zoom
@@ -570,7 +570,7 @@ public partial class FrmMain : Form
         if (next == current && factor > 1) next++;   // make sure zoom-out always moves
         trackManager.DrawTimescale = next;
         SyncZoomSlider();
-        trackManager.RedrawAll();
+        UpdateSizes();
     }
 
     // Keep the zoom slider roughly in sync (very long files go past its range; that's fine)

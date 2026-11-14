@@ -7,11 +7,13 @@ public class TrackManager
     private Track pseudoCombinedTrack;
     private Panel panContainer;
     private bool mixDirty;   // the mix changed while paused; rebuild it on resume
+    private long? seekSample;
 
     public List<Track> Tracks { get; private set; }
     public Track SelectedTrack { get; private set; }
     public int DrawTimescale { get; set; }
     public PlaybackState State => pseudoCombinedTrack?.State ?? PlaybackState.Stopped;
+    private long CurrentSample => seekSample ?? pseudoCombinedTrack?.GetPlayheadPos() ?? 0;
 
     public TrackManager(Panel panContainer)
     {
@@ -96,17 +98,29 @@ public class TrackManager
     {
         CombineTracks();
         mixDirty = false;
-        if (pseudoCombinedTrack.SampleCount == 0) return;   // nothing to play (e.g. every track disabled)
+        seekSample = null;
+        if (pseudoCombinedTrack.SampleCount == 0) return;
         long startSample = (long)(startSeconds * pseudoCombinedTrack.SampleRate * pseudoCombinedTrack.Channels);
         pseudoCombinedTrack.Play(startSample);
+    }
+
+    public void SeekToPixel(int x)
+    {
+        if (State != PlaybackState.Paused || pseudoCombinedTrack is null) return;
+
+        long total = pseudoCombinedTrack.SampleCount;
+        long sample = Math.Clamp((long)x * Math.Max(1, DrawTimescale), 0, total);
+        sample -= sample % pseudoCombinedTrack.Channels;   // stay on a whole frame
+        seekSample = sample;
     }
 
     // Continues from where it was paused (rebuilding the mix if something changed meanwhile)
     public void ResumeAll()
     {
-        if (mixDirty)
+        if (seekSample.HasValue || mixDirty)
         {
-            PlayAll(GetPlayheadSeconds());
+            double seconds = GetPlayheadSeconds();   // uses the dragged position if there is one
+            PlayAll(seconds);
         }
         else
         {
@@ -136,22 +150,22 @@ public class TrackManager
     // Stops playback and rewinds to the start
     public void StopAll()
     {
+        seekSample = null;
         pseudoCombinedTrack?.Stop();
     }
 
     // Playhead position in pixels (for drawing the playhead line)
     public int GetPlayheadPos()
     {
-        return (pseudoCombinedTrack?.GetPlayheadPos() ?? 0) / Math.Max(1, DrawTimescale);
+        return (int)(CurrentSample / Math.Max(1, DrawTimescale));
     }
 
     // Playhead position in seconds (for the time display)
     public double GetPlayheadSeconds()
     {
         if (pseudoCombinedTrack is null) return 0;
-        return pseudoCombinedTrack.GetPlayheadPos() / (double)(pseudoCombinedTrack.SampleRate * pseudoCombinedTrack.Channels);
+        return CurrentSample / (double)(pseudoCombinedTrack.SampleRate * pseudoCombinedTrack.Channels);
     }
-
     // Length of the longest track in seconds (for the time display)
     public double TotalSeconds => Tracks.Count == 0 ? 0 : Tracks.Max(t => t.DurationSeconds);
 

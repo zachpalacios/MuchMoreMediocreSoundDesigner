@@ -81,6 +81,7 @@ public partial class FrmMain : Form
             trackManager.MarkMixChanged();   // hear the new volume right away
         };
         lblPlayhead.Width = 2;       // thin playhead line
+        SetupPlayheadDrag();
         tmrUpdate.Interval = 15;     // update about 60 times a second
     }
     private void ApplySettings()
@@ -370,7 +371,16 @@ public partial class FrmMain : Form
             // Get the current horizontal scroll position
             int scrollX = -panTracks.AutoScrollPosition.X;
             // Convert the timeline position to the visible panel position
-            lblPlayhead.Left = playheadX - scrollX;
+            // (skip while dragging so the timer doesn't fight the mouse)
+            if (!draggingPlayhead)
+                lblPlayhead.Left = playheadX - scrollX;
+
+            // wider and grabbable only while paused
+            bool paused = state == NAudio.Wave.PlaybackState.Paused;
+            int wantWidth = paused ? 6 : 2;
+            if (lblPlayhead.Width != wantWidth) lblPlayhead.Width = wantWidth;
+            lblPlayhead.Cursor = paused ? Cursors.SizeWE : Cursors.Default;
+
             lblPlayhead.Visible = true;
             lblPlayhead.BringToFront();
         }
@@ -415,6 +425,36 @@ public partial class FrmMain : Form
     }
 
     // Helper methods
+    private bool draggingPlayhead = false;
+
+    private void SetupPlayheadDrag()
+    {
+        lblPlayhead.MouseDown += (s, e) =>
+        {
+            if (e.Button != MouseButtons.Left) return;
+            if (trackManager.State != NAudio.Wave.PlaybackState.Paused) return;
+            draggingPlayhead = true;
+            lblPlayhead.Capture = true;
+        };
+
+        lblPlayhead.MouseMove += (s, e) =>
+        {
+            if (!draggingPlayhead) return;
+
+            int scrollX = -panTracks.AutoScrollPosition.X;
+            int mouseX = panTracks.PointToClient(Cursor.Position).X;
+            int timelineX = Math.Max(0, mouseX + scrollX);
+
+            trackManager.SeekToPixel(timelineX);
+            lblPlayhead.Left = trackManager.GetPlayheadPos() - scrollX;
+        };
+
+        lblPlayhead.MouseUp += (s, e) =>
+        {
+            draggingPlayhead = false;
+            lblPlayhead.Capture = false;
+        };
+    }
     private Panel CreateTrackPanel(Track track)
     {
         track.TrackColor = TrackColors[nextColorIndex++ % TrackColors.Length];
@@ -1114,6 +1154,7 @@ public partial class FrmMain : Form
     }
 
     // Restart from the beginning, even if it's playing, paused, or stopped
+    // This is used by the Replay button and the Stop button.
     private void Replay()
     {
         if (trackManager.Tracks.Count == 0) return;

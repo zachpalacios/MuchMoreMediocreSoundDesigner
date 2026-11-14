@@ -226,6 +226,7 @@ public partial class FrmMain : Form
     {
         userStopped = true;
         trackManager.StopAll();
+        panTracks.AutoScrollPosition = new Point(0, -panTracks.AutoScrollPosition.Y);
         lblPlayhead.Left = 0;
     }
 
@@ -366,10 +367,20 @@ public partial class FrmMain : Form
                 btnPlay.Invalidate();   // redraw as play or pause
             }
             btnPlay.Visible = true;
-            // Get the current position of the playhead
             int playheadX = trackManager.GetPlayheadPos();
             // Get the current horizontal scroll position
             int scrollX = -panTracks.AutoScrollPosition.X;
+
+            // Follow the playhead: once it passes the middle of the view, scroll so it stays centered
+            if (playing && !draggingPlayhead)
+            {
+                int target = Math.Max(0, playheadX - panTracks.ClientSize.Width / 2);
+                if (target != scrollX)
+                {
+                    panTracks.AutoScrollPosition = new Point(target, -panTracks.AutoScrollPosition.Y);
+                    scrollX = -panTracks.AutoScrollPosition.X;   // re-read: WinForms clamps it at the end
+                }
+            }
             // Convert the timeline position to the visible panel position
             // (skip while dragging so the timer doesn't fight the mouse)
             if (!draggingPlayhead)
@@ -389,6 +400,7 @@ public partial class FrmMain : Form
             btnPlay.Visible = false;
             lblPlayhead.Visible = false;
         }
+        //test
 
         // Toolbar: only change text when it actually changes (avoids flicker)
         string playText = playing ? "|| Pause" : "\u25B6 Play";

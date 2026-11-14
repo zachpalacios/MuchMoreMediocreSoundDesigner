@@ -22,6 +22,19 @@ public partial class FrmMain : Form
     };
     private int nextColorIndex = 0;
 
+    // Play/pause images, loaded once (Resources.play creates a new image every time it's read)
+    private static readonly Image PlayImage = Resources.play;
+    private static readonly Image PauseImage = Resources.pause;
+
+    // Toolbar (built in code in BuildToolbar)
+    private ToolStrip toolbar;
+    private ToolStripButton tbUndo, tbRedo, tbPlay, tbStop, tbLoop;
+    private ToolStripLabel tbTime;
+
+    // Playback state used for Stop and Loop
+    private bool userStopped = false;
+    private NAudio.Wave.PlaybackState lastState = NAudio.Wave.PlaybackState.Stopped;
+
     // ctor
     public FrmMain()
     {
@@ -34,8 +47,9 @@ public partial class FrmMain : Form
     {
         DoubleBuffered = true;
         trackManager = new(panTracks);
-        btnPlay.BackgroundImage = Resources.play;
+        btnPlay.BackgroundImage = PlayImage;
         trackManager.DrawTimescale = trkDrawTimescale.Value;
+        BuildToolbar();
         UpdateSizes();
         ApplySettings();
         SyncVolumeSlider();
@@ -136,18 +150,32 @@ public partial class FrmMain : Form
         UpdateSizes();
     }
 
+    // Play / Pause / Resume (the big button, the toolbar button and Space all use this)
     private void btnPlay_Click(object sender, EventArgs e)
     {
-        if (trackManager.State is NAudio.Wave.PlaybackState.Stopped or NAudio.Wave.PlaybackState.Paused)
+        if (trackManager.Tracks.Count == 0) return;
+
+        switch (trackManager.State)
         {
-            trackManager.PlayAll();
-            btnPlay.BackgroundImage = Resources.pause;
+            case NAudio.Wave.PlaybackState.Playing:
+                trackManager.PauseAll();
+                break;
+            case NAudio.Wave.PlaybackState.Paused:
+                trackManager.ResumeAll();     // continue where it was paused
+                break;
+            default:
+                trackManager.PlayAll();       // start from the beginning
+                break;
         }
-        else
-        {
-            trackManager.PauseAll();
-            btnPlay.BackgroundImage = Resources.play;
-        }
+        userStopped = false;
+    }
+
+    // Stop and rewind to the start
+    private void StopPlayback()
+    {
+        userStopped = true;
+        trackManager.StopAll();
+        lblPlayhead.Left = 0;
     }
 
     private void menuFileOpen_Click(object sender, EventArgs e)
@@ -265,9 +293,24 @@ public partial class FrmMain : Form
 
     private void tmrUpdatePlaybackState_Tick(object sender, EventArgs e)
     {
-        if (trackManager.Tracks.Count > 0)
+        var state = trackManager.State;
+        bool hasTracks = trackManager.Tracks.Count > 0;
+
+        // Loop: if playback just reached the end by itself, start again
+        if (tbLoop.Checked && hasTracks && !userStopped
+            && lastState == NAudio.Wave.PlaybackState.Playing
+            && state == NAudio.Wave.PlaybackState.Stopped)
         {
-            btnPlay.BackgroundImage = trackManager.State == NAudio.Wave.PlaybackState.Playing ? Resources.pause : Resources.play;
+            trackManager.PlayAll();
+            state = trackManager.State;
+        }
+        lastState = state;
+
+        bool playing = state == NAudio.Wave.PlaybackState.Playing;
+        if (hasTracks)
+        {
+            Image want = playing ? PauseImage : PlayImage;
+            if (btnPlay.BackgroundImage != want) btnPlay.BackgroundImage = want;
             btnPlay.Visible = true;
             lblPlayhead.Left = trackManager.GetPlayheadPos();
             lblPlayhead.Visible = true;
@@ -278,6 +321,22 @@ public partial class FrmMain : Form
             btnPlay.Visible = false;
             lblPlayhead.Visible = false;
         }
+
+        // Toolbar: only change text when it actually changes (avoids flicker)
+        string playText = playing ? "|| Pause" : "\u25B6 Play";
+        if (tbPlay.Text != playText) tbPlay.Text = playText;
+        tbPlay.Enabled = hasTracks;
+        tbStop.Enabled = hasTracks;
+
+        string time = $"{FormatTime(trackManager.GetPlayheadSeconds())} / {FormatTime(trackManager.TotalSeconds)}";
+        if (tbTime.Text != time) tbTime.Text = time;
+    }
+
+    // 75.3 seconds -> "1:15.3"
+    private static string FormatTime(double seconds)
+    {
+        int minutes = (int)(seconds / 60);
+        return $"{minutes}:{seconds - minutes * 60:00.0}";
     }
 
     private void trkDrawTimescale_Scroll(object sender, EventArgs e)
@@ -335,6 +394,15 @@ public partial class FrmMain : Form
         panTracks.Left = PADDING;
         panTracks.Width = ClientSize.Width - (PADDING * 2);
 
+        // Make room for the toolbar if it overlaps the zoom slider (e.g. at high display scaling)
+        if (toolbar != null && trkDrawTimescale.Top < toolbar.Bottom + 2)
+        {
+            int shift = toolbar.Bottom + 2 - trkDrawTimescale.Top;
+            trkDrawTimescale.Top += shift;
+            panTracks.Top += shift;
+            panTracks.Height -= shift;
+        }
+
         int top = 0;
         if (trackManager is null) return;
         const int GAP = 4;   // space between tracks
@@ -365,13 +433,91 @@ public partial class FrmMain : Form
         int samplesPerPixel = Math.Max(1, (int)Math.Ceiling(longest / (double)width));
 
         trackManager.DrawTimescale = samplesPerPixel;
-
-        // keep the zoom slider roughly in sync (very long files go past its range; that's fine)
-        trkDrawTimescale.Value = Math.Clamp(
-            trkDrawTimescale.Maximum + trkDrawTimescale.Minimum - samplesPerPixel,
-            trkDrawTimescale.Minimum, trkDrawTimescale.Maximum);
-
+        SyncZoomSlider();
         trackManager.RedrawAll();
+    }
+
+    // Zoom in (factor < 1) or out (factor > 1) from the current zoom
+    private void ZoomBy(double factor)
+    {
+        int current = trackManager.DrawTimescale;
+        int next = Math.Max(1, (int)Math.Round(current * factor));
+        if (next == current && factor > 1) next++;   // make sure zoom-out always moves
+        trackManager.DrawTimescale = next;
+        SyncZoomSlider();
+        trackManager.RedrawAll();
+    }
+
+    // Keep the zoom slider roughly in sync (very long files go past its range; that's fine)
+    private void SyncZoomSlider()
+    {
+        trkDrawTimescale.Value = Math.Clamp(
+            trkDrawTimescale.Maximum + trkDrawTimescale.Minimum - trackManager.DrawTimescale,
+            trkDrawTimescale.Minimum, trkDrawTimescale.Maximum);
+    }
+
+    // Builds the toolbar under the menu (done in code so the form designer isn't needed)
+    private void BuildToolbar()
+    {
+        toolbar = new ToolStrip
+        {
+            Dock = DockStyle.Top,
+            GripStyle = ToolStripGripStyle.Hidden,
+            RenderMode = ToolStripRenderMode.System,
+            BackColor = Color.FromArgb(40, 40, 40),
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI", 10f),
+            Padding = new Padding(6, 2, 6, 2)
+        };
+
+        ToolStripButton MakeButton(string text, string tip, Action onClick)
+        {
+            var b = new ToolStripButton(text)
+            {
+                DisplayStyle = ToolStripItemDisplayStyle.Text,
+                ToolTipText = tip,
+                ForeColor = Color.White,
+                Margin = new Padding(2, 1, 2, 1)
+            };
+            b.Click += (s, e) => onClick();
+            return b;
+        }
+
+        var tbOpen = MakeButton("Open", "Open audio file (Ctrl+O)", () => menuFileOpen_Click(this, EventArgs.Empty));
+        var tbSave = MakeButton("Save", "Save mix as .wav (Ctrl+S)", () => menuFileSave_Click(this, EventArgs.Empty));
+        tbUndo = MakeButton("Undo", "Undo (Ctrl+Z)", () => menuEditUndo_Click(this, EventArgs.Empty));
+        tbRedo = MakeButton("Redo", "Redo (Ctrl+Y)", () => menuEditRedo_Click(this, EventArgs.Empty));
+        tbPlay = MakeButton("\u25B6 Play", "Play / Pause (Space)", () => btnPlay_Click(this, EventArgs.Empty));
+        tbStop = MakeButton("\u25A0 Stop", "Stop and rewind to the start", StopPlayback);
+        tbLoop = MakeButton("Loop", "Loop playback: start again at the end", () => { });
+        tbLoop.CheckOnClick = true;
+        tbLoop.CheckedChanged += (s, e) => tbLoop.ForeColor = tbLoop.Checked ? Color.LimeGreen : Color.White;
+        var tbZoomOut = MakeButton("Zoom \u2212", "Zoom out", () => ZoomBy(2.0));
+        var tbZoomIn = MakeButton("Zoom +", "Zoom in", () => ZoomBy(0.5));
+        var tbFit = MakeButton("Fit", "Fit the longest track to the window", ZoomToFit);
+
+        tbTime = new ToolStripLabel("0:00.0 / 0:00.0")
+        {
+            Alignment = ToolStripItemAlignment.Right,
+            ForeColor = Color.White,
+            Font = new Font("Consolas", 11f, FontStyle.Bold),
+            Margin = new Padding(2, 1, 8, 1)
+        };
+
+        toolbar.Items.AddRange(new ToolStripItem[]
+        {
+            tbOpen, tbSave,
+            new ToolStripSeparator(),
+            tbUndo, tbRedo,
+            new ToolStripSeparator(),
+            tbPlay, tbStop, tbLoop,
+            new ToolStripSeparator(),
+            tbZoomOut, tbZoomIn, tbFit,
+            tbTime
+        });
+
+        Controls.Add(toolbar);
+        toolbar.BringToFront();   // docks it just below the menu bar
     }
 
     private float? AskFadeDuration(string title)
@@ -617,6 +763,8 @@ public partial class FrmMain : Form
     {
         menuEditUndo.Enabled = undoManager.CanUndo;
         menuEditRedo.Enabled = undoManager.CanRedo;
+        if (tbUndo != null) tbUndo.Enabled = undoManager.CanUndo;
+        if (tbRedo != null) tbRedo.Enabled = undoManager.CanRedo;
     }
 
     private void menuEditUndo_Click(object sender, EventArgs e)

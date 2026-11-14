@@ -22,9 +22,10 @@ public partial class FrmMain : Form
     };
     private int nextColorIndex = 0;
 
-    // Play/pause images, loaded once (Resources.play creates a new image every time it's read)
-    private static readonly Image PlayImage = Resources.play;
-    private static readonly Image PauseImage = Resources.pause;
+    // Custom-drawn controls
+    private FlatSlider volumeSlider, zoomSlider;
+    private bool playIconIsPause = false;   // what the round play button currently shows
+    private bool playHover = false;          // mouse is over the play button
 
     // Toolbar (built in code in BuildToolbar)
     private ToolStrip toolbar;
@@ -50,17 +51,25 @@ public partial class FrmMain : Form
     private void Setup()
     {
         DoubleBuffered = true;
+        Text = "Much More Mediocre Sound Designer";
+        ToolStripManager.Renderer = new DarkToolStripRenderer();   // dark menus, drop-downs, right-click menus, toolbar
         trackManager = new(panTracks);
-        btnPlay.BackgroundImage = PlayImage;
+        SetupPlayButton();
         trackManager.DrawTimescale = trkDrawTimescale.Value;
         BuildToolbar();
         BuildViewMenu();
+
+        // Swap the standard Windows sliders for flat custom ones (the originals stay hidden underneath)
+        volumeSlider = ReplaceTrackBar(trkVolume, () => trkVolume_Scroll(trkVolume, EventArgs.Empty));
+        volumeSlider.Mark = 100;
+        zoomSlider = ReplaceTrackBar(trkDrawTimescale, () => trkDrawTimescale_Scroll(trkDrawTimescale, EventArgs.Empty));
+        zoomSlider.WheelStep = 20;
         UpdateSizes();
         ApplySettings();
         SyncVolumeSlider();
         UpdateUndoMenu();
-        trkVolume.MouseDown += (s, e) => volumeSnapshot = undoManager.Capture(trackManager.SelectedTrack);
-        trkVolume.MouseUp += (s, e) =>
+        volumeSlider.MouseDown += (s, e) => volumeSnapshot = undoManager.Capture(trackManager.SelectedTrack);
+        volumeSlider.MouseUp += (s, e) =>
         {
             if (volumeSnapshot is not null && volumeSnapshot.Volume != trackManager.SelectedTrack?.Volume)
             {
@@ -75,10 +84,57 @@ public partial class FrmMain : Form
     }
     private void ApplySettings()
     {
-        BackColor = Settings.Color.WinBg;
-        panTracks.BackColor = Settings.Color.TrackBg_Unselected;
-        lblPlayhead.BackColor = Settings.Color.Playline;
+        var c = Settings.Color;
+
+        // window
+        BackColor = c.WinBg;
+        ForeColor = c.WinFg;
+
+        // track area: flat (no 3D border), slightly lighter than the window
+        panTracks.BackColor = c.TrackArea;
+        panTracks.BorderStyle = BorderStyle.None;
+        lblPlayhead.BackColor = c.Playline;
+
+        // sliders blend into the window instead of grey boxes
+        trkDrawTimescale.BackColor = c.WinBg;
+        trkVolume.BackColor = c.WinBg;
+        foreach (FlatSlider slider in new[] { volumeSlider, zoomSlider })
+        {
+            if (slider is null) continue;
+            slider.BackColor = c.WinBg;
+            slider.AccentColor = c.Accent;
+            slider.ThumbColor = c.WinFg;
+            slider.Invalidate();
+        }
+
+        // round play button
+        btnPlay.BackColor = c.WinBg;
+        btnPlay.FlatAppearance.MouseOverBackColor = c.WinBg;
+        btnPlay.FlatAppearance.MouseDownBackColor = c.WinBg;
+        btnPlay.Invalidate();
+
+        // title bar + menus follow the theme
+        DarkTheme.ApplyTitleBar(this);
+        menu.Invalidate();
+
+        // secondary text
+        volumeLbl.ForeColor = c.TextDim;
+        lblDebug.ForeColor = c.TextDim;
+
+        // toolbar
+        if (toolbar != null)
+        {
+            toolbar.BackColor = c.Toolbar;
+            foreach (ToolStripItem item in toolbar.Items)
+            {
+                item.ForeColor = c.WinFg;
+            }
+            if (tbLoop.Checked) tbLoop.ForeColor = Color.LimeGreen;
+            tbTime.ForeColor = c.TextDim;
+        }
+
         trackManager.ApplySettings();
+        UpdateSizes();   // the track area lost its 3D border, so re-fit the tracks
     }
 
     // GUI controls
@@ -302,15 +358,17 @@ public partial class FrmMain : Form
         bool playing = state == NAudio.Wave.PlaybackState.Playing;
         if (hasTracks)
         {
-            Image want = playing ? PauseImage : PlayImage;
-            if (btnPlay.BackgroundImage != want) btnPlay.BackgroundImage = want;
+            if (playIconIsPause != playing)
+            {
+                playIconIsPause = playing;
+                btnPlay.Invalidate();   // redraw as play or pause
+            }
             btnPlay.Visible = true;
             lblPlayhead.Left = trackManager.GetPlayheadPos();
             lblPlayhead.Visible = true;
         }
         else
         {
-            btnPlay.BackgroundImage = null;
             btnPlay.Visible = false;
             lblPlayhead.Visible = false;
         }
@@ -393,8 +451,8 @@ public partial class FrmMain : Form
         btnSolo.CheckedChanged += (s, e) => { track.IsSoloed = btnSolo.Checked; trackManager.RedrawAll(); trackManager.MarkMixChanged(); };
         pan.Controls.Add(btnSolo);
         pan.Controls.Add(btnMute);
-        btnSolo.Location = new Point(pan.Width - btnSolo.Width - 8, 6);
-        btnMute.Location = new Point(btnSolo.Left - btnMute.Width - 4, 6);
+        btnSolo.Location = new Point(pan.Width - btnSolo.Width - 16, 8);
+        btnMute.Location = new Point(btnSolo.Left - btnMute.Width - 4, 8);
 
         panTracks.Controls.Add(pan);
         track.LinkPanels(pan, panTracks);
@@ -488,7 +546,7 @@ public partial class FrmMain : Form
         {
             Dock = DockStyle.Top,
             GripStyle = ToolStripGripStyle.Hidden,
-            RenderMode = ToolStripRenderMode.System,
+            RenderMode = ToolStripRenderMode.ManagerRenderMode,   // uses the dark renderer
             BackColor = Color.FromArgb(40, 40, 40),
             ForeColor = Color.White,
             Font = new Font("Segoe UI", 10f),
@@ -516,7 +574,7 @@ public partial class FrmMain : Form
         tbStop = MakeButton("\u25A0 Stop", "Stop and rewind to the start", StopPlayback);
         tbLoop = MakeButton("Loop", "Loop playback: start again at the end", () => { });
         tbLoop.CheckOnClick = true;
-        tbLoop.CheckedChanged += (s, e) => tbLoop.ForeColor = tbLoop.Checked ? Color.LimeGreen : Color.White;
+        tbLoop.CheckedChanged += (s, e) => tbLoop.ForeColor = tbLoop.Checked ? Color.LimeGreen : Settings.Color.WinFg;
         var tbZoomOut = MakeButton("Zoom \u2212", "Zoom out", () => ZoomBy(2.0));
         var tbZoomIn = MakeButton("Zoom +", "Zoom in", () => ZoomBy(0.5));
         var tbFit = MakeButton("Fit", "Fit the longest track to the window", ZoomToFit);
@@ -616,6 +674,7 @@ public partial class FrmMain : Form
     {
         if (trackManager.SelectedTrack is null) return;
         trackManager.SelectedTrack.SetVolume(trkVolume.Value / 100.0f);
+        volumeLbl.Text = $"Volume  {trkVolume.Value}%";
         trackManager.SelectedTrack.PanDrawSamples.Invalidate();
     }
 
@@ -631,6 +690,7 @@ public partial class FrmMain : Form
         {
             trkVolume.Value = Math.Clamp((int)Math.Round(t.Volume * 100f), trkVolume.Minimum, trkVolume.Maximum);
         }
+        volumeLbl.Text = t is null ? "Volume" : $"Volume  {trkVolume.Value}%";
     }
 
     private void menuEditFadeIn_Click(object sender, EventArgs e)
@@ -928,6 +988,109 @@ public partial class FrmMain : Form
         return null;
     }
 
+
+    // ---------- Look & feel: dark title bar, round play button, flat sliders ----------
+
+    // Dark title bar as soon as the window exists
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        DarkTheme.ApplyTitleBar(this);
+    }
+
+    // The big play button is drawn by hand: a flat accent-colored circle with a play or pause icon
+    private void SetupPlayButton()
+    {
+        btnPlay.BackgroundImage = null;
+        btnPlay.Text = "";
+        btnPlay.FlatStyle = FlatStyle.Flat;
+        btnPlay.FlatAppearance.BorderSize = 0;
+        btnPlay.Cursor = Cursors.Hand;
+        btnPlay.MouseEnter += (s, e) => { playHover = true; btnPlay.Invalidate(); };
+        btnPlay.MouseLeave += (s, e) => { playHover = false; btnPlay.Invalidate(); };
+        btnPlay.Paint += DrawPlayButton;
+    }
+
+    private void DrawPlayButton(object sender, PaintEventArgs e)
+    {
+        Graphics g = e.Graphics;
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        g.Clear(Settings.Color.WinBg);
+
+        // circle, centered, a little smaller than the button
+        int size = Math.Min(btnPlay.Width, btnPlay.Height) - 12;
+        Rectangle circle = new((btnPlay.Width - size) / 2, (btnPlay.Height - size) / 2, size, size);
+        Color accent = Settings.Color.Accent;
+        Color fill = playHover ? ControlPaint.Light(accent, 0.3f) : accent;
+        using (SolidBrush brush = new(fill))
+        {
+            g.FillEllipse(brush, circle);
+        }
+
+        // icon in the window background color
+        using SolidBrush icon = new(Settings.Color.WinBg);
+        float cx = circle.Left + circle.Width / 2f;
+        float cy = circle.Top + circle.Height / 2f;
+        float s = size * 0.22f;
+        if (playIconIsPause)
+        {
+            float barW = s * 0.55f, gap = s * 0.35f;
+            g.FillRectangle(icon, cx - gap - barW, cy - s, barW, s * 2);
+            g.FillRectangle(icon, cx + gap, cy - s, barW, s * 2);
+        }
+        else
+        {
+            // triangle nudged right so it looks centered
+            float nudge = s * 0.2f;
+            g.FillPolygon(icon, new[]
+            {
+                new PointF(cx - s * 0.8f + nudge, cy - s),
+                new PointF(cx - s * 0.8f + nudge, cy + s),
+                new PointF(cx + s + nudge, cy)
+            });
+        }
+    }
+
+    // Puts a FlatSlider exactly where a TrackBar is and keeps the two in sync.
+    // The hidden TrackBar keeps working as before, so the rest of the code doesn't change.
+    private FlatSlider ReplaceTrackBar(TrackBar trackBar, Action onUserChange)
+    {
+        FlatSlider slider = new()
+        {
+            Minimum = trackBar.Minimum,
+            Maximum = trackBar.Maximum,
+            Value = trackBar.Value,
+            Bounds = trackBar.Bounds,
+            Anchor = trackBar.Anchor,
+            Enabled = trackBar.Enabled,
+            BackColor = Settings.Color.WinBg,
+            AccentColor = Settings.Color.Accent
+        };
+        trackBar.Parent.Controls.Add(slider);
+        slider.BringToFront();
+        trackBar.Visible = false;
+
+        bool syncing = false;
+        slider.Scroll += (s, e) =>
+        {
+            if (syncing) return;
+            syncing = true;
+            trackBar.Value = slider.Value;
+            syncing = false;
+            onUserChange();
+        };
+        trackBar.ValueChanged += (s, e) =>
+        {
+            if (syncing) return;
+            syncing = true;
+            slider.Value = trackBar.Value;
+            syncing = false;
+        };
+        trackBar.EnabledChanged += (s, e) => slider.Enabled = trackBar.Enabled;
+        trackBar.LocationChanged += (s, e) => slider.Bounds = trackBar.Bounds;
+        trackBar.SizeChanged += (s, e) => slider.Bounds = trackBar.Bounds;
+        return slider;
+    }
 
     // ---------- Track controls (right-click menu, mute/solo, track height) ----------
 

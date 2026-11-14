@@ -57,7 +57,8 @@ public class TrackManager
             track.PanDrawSamples.BorderStyle = BorderStyle.None;
             track.PanDrawSamples.BackColor = Settings.Color.TrackBg_Unselected;
         });
-        track.PanDrawSamples.BorderStyle = BorderStyle.Fixed3D;
+        // flat look: the selected track is lighter and gets a colored border (drawn in FrmMain), no 3D edge
+        track.PanDrawSamples.BorderStyle = BorderStyle.None;
         track.PanDrawSamples.BackColor = Settings.Color.TrackBg_Selected;
     }
 

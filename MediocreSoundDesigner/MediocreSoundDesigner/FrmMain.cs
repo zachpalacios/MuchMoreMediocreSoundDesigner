@@ -55,6 +55,7 @@ public partial class FrmMain : Form
         ToolStripManager.Renderer = new DarkToolStripRenderer();   // dark menus, drop-downs, right-click menus, toolbar
         trackManager = new(panTracks);
         SetupPlayButton();
+        SetupReplayButton();
         trackManager.DrawTimescale = trkDrawTimescale.Value;
         BuildToolbar();
         BuildViewMenu();
@@ -1067,6 +1068,59 @@ public partial class FrmMain : Form
         btnPlay.MouseEnter += (s, e) => { playHover = true; btnPlay.Invalidate(); };
         btnPlay.MouseLeave += (s, e) => { playHover = false; btnPlay.Invalidate(); };
         btnPlay.Paint += DrawPlayButton;
+    }
+    private Button btnReplay;
+
+    private void SetupReplayButton()
+    {
+        btnReplay = new Button
+        {
+            Name = "btnReplay",
+            Size = new Size(48, 48),
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.Transparent,
+            Cursor = Cursors.Hand,
+            Text = ""
+        };
+        btnReplay.FlatAppearance.BorderSize = 0;
+        btnReplay.FlatAppearance.MouseOverBackColor = Color.Transparent;
+        btnReplay.FlatAppearance.MouseDownBackColor = Color.Transparent;
+        btnReplay.Paint += DrawReplayButton;
+        btnReplay.Click += (s, e) => Replay();
+        new ToolTip().SetToolTip(btnReplay, "Replay from the beginning");
+
+        PositionReplayButton();
+        Resize += (s, e) => PositionReplayButton();
+
+        Controls.Add(btnReplay);
+        btnReplay.BringToFront();
+    }
+
+    private void PositionReplayButton()
+    {
+        btnReplay.Location = new Point(btnPlay.Right + 12, btnPlay.Top + (btnPlay.Height - 48) / 2);
+    }
+
+    private void DrawReplayButton(object sender, PaintEventArgs e)
+    {
+        Graphics g = e.Graphics;
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        g.Clear(Settings.Color.WinBg);
+
+        // circular arrow
+        using Pen pen = new(Settings.Color.Accent, 4f);
+        pen.CustomEndCap = new System.Drawing.Drawing2D.AdjustableArrowCap(4, 4);
+        g.DrawArc(pen, new RectangleF(9, 9, 30, 30), -60, 300);
+    }
+
+    // Restart from the beginning, even if it's playing, paused, or stopped
+    private void Replay()
+    {
+        if (trackManager.Tracks.Count == 0) return;
+        trackManager.StopAll();
+        trackManager.PlayAll();
+        userStopped = false;
+        lblPlayhead.Left = 0;
     }
 
     private void DrawPlayButton(object sender, PaintEventArgs e)

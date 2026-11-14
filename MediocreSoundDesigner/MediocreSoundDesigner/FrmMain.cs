@@ -173,6 +173,17 @@ public partial class FrmMain : Form
             menuEditFlip_Click(this, EventArgs.Empty);
             return true;
         }
+        else if (keyData == Keys.Home)
+        {
+            Replay();
+            return true;
+        }
+        //stop and rewind
+        else if (keyData == Keys.Escape)
+        {
+            StopPlayback();
+            return true;
+        }
 
         //Exsisting keyboard controls
         if (trackManager.SelectedTrack is not null)
@@ -893,7 +904,9 @@ public partial class FrmMain : Form
             { "Shift Track Right", "Right Arrow" },
             { "Delete Selected Track", "Delete" },
             { "Undo", "Ctrl + Z" },
-            { "Redo", "Ctrl + Y" }
+            { "Redo", "Ctrl + Y" },
+            { "Replay from Start", "Home" },
+            { "Stop and Rewind", "Esc" },
         };
 
         // Loop through the shortcuts and add each to the list

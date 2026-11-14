@@ -6,6 +6,7 @@ public class TrackManager
 {
     private Track pseudoCombinedTrack;
     private Panel panContainer;
+    private bool mixDirty;   // the mix changed while paused; rebuild it on resume
 
     public List<Track> Tracks { get; private set; }
     public Track SelectedTrack { get; private set; }
@@ -23,6 +24,21 @@ public class TrackManager
     public void AddTrack(Track track)
     {
         Tracks.Add(track);
+    }
+
+    // Adds newTrack right below existing (used by Duplicate)
+    public void InsertTrackAfter(Track existing, Track newTrack)
+    {
+        int index = Tracks.IndexOf(existing);
+        Tracks.Insert(index < 0 ? Tracks.Count : index + 1, newTrack);
+    }
+
+    // Is this track heard in the mix? (not disabled, not muted, and soloed if anything is soloed)
+    public bool IsAudible(Track track)
+    {
+        if (track.IsDisabled || track.IsMuted) return false;
+        bool anySoloed = Tracks.Any(t => t.IsSoloed);
+        return !anySoloed || track.IsSoloed;
     }
 
     public void RemTrack(Track track)
@@ -74,18 +90,41 @@ public class TrackManager
 
     // --- playback ---
 
-    // Starts playing from the beginning (rebuilds the mix so recent edits are heard)
-    public void PlayAll()
+    // Starts playing (rebuilds the mix so recent edits are heard). startSeconds = where to start.
+    public void PlayAll(double startSeconds = 0)
     {
         CombineTracks();
+        mixDirty = false;
         if (pseudoCombinedTrack.SampleCount == 0) return;   // nothing to play (e.g. every track disabled)
-        pseudoCombinedTrack.Play();
+        long startSample = (long)(startSeconds * pseudoCombinedTrack.SampleRate * pseudoCombinedTrack.Channels);
+        pseudoCombinedTrack.Play(startSample);
     }
 
-    // Continues from where it was paused
+    // Continues from where it was paused (rebuilding the mix if something changed meanwhile)
     public void ResumeAll()
     {
-        pseudoCombinedTrack?.Resume();
+        if (mixDirty)
+        {
+            PlayAll(GetPlayheadSeconds());
+        }
+        else
+        {
+            pseudoCombinedTrack?.Resume();
+        }
+    }
+
+    // Call after any edit, mute/solo or delete: playing audio updates right away, paused audio on resume
+    public void MarkMixChanged()
+    {
+        PlaybackState state = State;
+        if (state == PlaybackState.Playing)
+        {
+            PlayAll(GetPlayheadSeconds());
+        }
+        else if (state == PlaybackState.Paused)
+        {
+            mixDirty = true;
+        }
     }
 
     public void PauseAll()
@@ -121,7 +160,7 @@ public class TrackManager
     {
         pseudoCombinedTrack?.Dispose();
 
-        List<Track> enabled = Tracks.Where(t => !t.IsDisabled).ToList();
+        List<Track> enabled = Tracks.Where(IsAudible).ToList();
         int channels = enabled.Count == 0 ? 1 : enabled.Max(t => t.Channels);
         int sampleRate = enabled.Count == 0 ? 44100 : enabled[0].SampleRate;
 

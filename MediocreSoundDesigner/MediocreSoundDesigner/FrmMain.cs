@@ -31,6 +31,10 @@ public partial class FrmMain : Form
     private ToolStripButton tbUndo, tbRedo, tbPlay, tbStop, tbLoop;
     private ToolStripLabel tbTime;
 
+    // Track height: 0 = fit all tracks in the window, otherwise a fixed height in pixels
+    private int trackHeight = 0;
+    private readonly ToolTip trackTips = new();
+
     // Playback state used for Stop and Loop
     private bool userStopped = false;
     private NAudio.Wave.PlaybackState lastState = NAudio.Wave.PlaybackState.Stopped;
@@ -50,6 +54,7 @@ public partial class FrmMain : Form
         btnPlay.BackgroundImage = PlayImage;
         trackManager.DrawTimescale = trkDrawTimescale.Value;
         BuildToolbar();
+        BuildViewMenu();
         UpdateSizes();
         ApplySettings();
         SyncVolumeSlider();
@@ -63,6 +68,7 @@ public partial class FrmMain : Form
                 UpdateUndoMenu();
             }
             volumeSnapshot = null;
+            trackManager.MarkMixChanged();   // hear the new volume right away
         };
         lblPlayhead.Width = 2;       // thin playhead line
         tmrUpdate.Interval = 15;     // update about 60 times a second
@@ -125,21 +131,8 @@ public partial class FrmMain : Form
             }
             else if (keyData == Keys.Delete)
             {
-                if (trackManager.SelectedTrack is not null)
-                {
-                    if (MessageBox.Show("This will delete the selected track. This is NOT undoable!", "Are You Sure?", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Exclamation) == DialogResult.Yes)
-                    {
-                        panTracks.Controls.Remove(trackManager.SelectedTrack.PanDrawSamples);
-                        undoManager.Forget(trackManager.SelectedTrack);
-                        UpdateUndoMenu();
-                        trackManager.SelectedTrack.PanDrawSamples.Dispose();
-                        trackManager.SelectedTrack.Dispose();
-                        trackManager.RemTrack(trackManager.SelectedTrack);
-                        SyncVolumeSlider();
-                        UpdateSizes();
-                        return true;
-                    }
-                }
+                DeleteTrack(trackManager.SelectedTrack);
+                return true;
             }
         }
         return base.ProcessCmdKey(ref msg, keyData);
@@ -358,7 +351,8 @@ public partial class FrmMain : Form
             Left = 0,
             Top = 0,
         };
-        pan.Click += (sender, e) =>
+        // Left or right click selects the track (right click then opens the menu)
+        pan.MouseDown += (sender, e) =>
         {
             trackManager.SelectTrack(track);
             SyncVolumeSlider();
@@ -368,10 +362,12 @@ public partial class FrmMain : Form
         {
             track.ToggleDisabled();
             track.PanDrawSamples.Invalidate();
+            trackManager.MarkMixChanged();
         };
         pan.Paint += (sender, e) =>
         {
-            track.DrawSamples(e.Graphics, trackManager.DrawTimescale);
+            bool dimmed = !track.IsDisabled && !trackManager.IsAudible(track);   // muted or not soloed
+            track.DrawSamples(e.Graphics, trackManager.DrawTimescale, dimmed);
             if (trackManager.SelectedTrack == track)
             {
                 // colored border around the selected track
@@ -379,6 +375,27 @@ public partial class FrmMain : Form
                 e.Graphics.DrawRectangle(border, 1, 1, pan.Width - 3, pan.Height - 3);
             }
         };
+        // Right-click menu
+        ContextMenuStrip menuTrack = new();
+        menuTrack.Items.Add("Change Color...", null, (s, e) => ChangeTrackColor(track));
+        menuTrack.Items.Add("Rename...", null, (s, e) => RenameTrack(track));
+        menuTrack.Items.Add("Duplicate", null, (s, e) => DuplicateTrack(track));
+        menuTrack.Items.Add(new ToolStripSeparator());
+        menuTrack.Items.Add("Delete", null, (s, e) => DeleteTrack(track));
+        pan.ContextMenuStrip = menuTrack;
+
+        // Mute / Solo buttons in the top-right corner
+        CheckBox btnSolo = MakeTrackToggle("S", Color.Gold, "Solo: play only this track (and other soloed tracks)");
+        CheckBox btnMute = MakeTrackToggle("M", Color.OrangeRed, "Mute: silence this track");
+        btnSolo.Checked = track.IsSoloed;
+        btnMute.Checked = track.IsMuted;
+        btnMute.CheckedChanged += (s, e) => { track.IsMuted = btnMute.Checked; trackManager.RedrawAll(); trackManager.MarkMixChanged(); };
+        btnSolo.CheckedChanged += (s, e) => { track.IsSoloed = btnSolo.Checked; trackManager.RedrawAll(); trackManager.MarkMixChanged(); };
+        pan.Controls.Add(btnSolo);
+        pan.Controls.Add(btnMute);
+        btnSolo.Location = new Point(pan.Width - btnSolo.Width - 8, 6);
+        btnMute.Location = new Point(btnSolo.Left - btnMute.Width - 4, 6);
+
         panTracks.Controls.Add(pan);
         track.LinkPanels(pan, panTracks);
         trackManager.SelectTrack(track);
@@ -403,14 +420,21 @@ public partial class FrmMain : Form
             panTracks.Height -= shift;
         }
 
-        int top = 0;
         if (trackManager is null) return;
         const int GAP = 4;   // space between tracks
+        int count = Math.Max(1, trackManager.Tracks.Count);
+
+        // Fixed heights scroll when they don't fit; "Fit" squeezes all tracks into the window
+        int height = trackHeight > 0 ? trackHeight : (panTracks.ClientSize.Height / count) - GAP;
+        bool scrolling = trackHeight > 0 && count * (height + GAP) > panTracks.ClientSize.Height;
+        int width = panTracks.ClientSize.Width - (scrolling ? SystemInformation.VerticalScrollBarWidth : 0);
+
+        int top = panTracks.AutoScrollPosition.Y;   // account for the current scroll position
         foreach (Track track in trackManager.Tracks)
         {
             track.PanDrawSamples.Left = 0;
-            track.PanDrawSamples.Width = panTracks.Width;
-            track.PanDrawSamples.Height = (panTracks.Height / trackManager.Tracks.Count) - GAP;
+            track.PanDrawSamples.Width = width;
+            track.PanDrawSamples.Height = Math.Max(20, height);
             track.PanDrawSamples.Top = top;
             track.PanDrawSamples.Invalidate();
             top += track.PanDrawSamples.Height + GAP;
@@ -418,7 +442,8 @@ public partial class FrmMain : Form
         trkDrawTimescale.Width = panTracks.Width;
         trkDrawTimescale.Left = PADDING;
         lblPlayhead.Left = 0;
-        lblPlayhead.Height = panTracks.Height;
+        lblPlayhead.Top = panTracks.AutoScrollPosition.Y;
+        lblPlayhead.Height = Math.Max(panTracks.ClientSize.Height, top - panTracks.AutoScrollPosition.Y);
         lblPlayhead.BringToFront();
         ZoomToFit();   // make the longest track fill the width
     }
@@ -629,6 +654,7 @@ public partial class FrmMain : Form
         // Refresh the waveform after modifying the samples
         track.PanDrawSamples.Invalidate();
         UpdateUndoMenu();
+        trackManager.MarkMixChanged();
     }
 
     private void menuEditFadeOut_Click(object sender, EventArgs e)
@@ -651,6 +677,7 @@ public partial class FrmMain : Form
 
         track.PanDrawSamples.Invalidate();
         UpdateUndoMenu();
+        trackManager.MarkMixChanged();
     }
 
     // Window to show all the keyboard shorcuts
@@ -738,6 +765,7 @@ public partial class FrmMain : Form
         edit(track);
         track.PanDrawSamples.Invalidate();
         UpdateUndoMenu();
+        trackManager.MarkMixChanged();   // hear the edit right away
     }
 
     // Shows an edit dialog; only saves an undo step if the user clicks Apply
@@ -754,6 +782,7 @@ public partial class FrmMain : Form
                 undoManager.Push(before);
                 UpdateUndoMenu();
                 SyncVolumeSlider();
+                trackManager.MarkMixChanged();
             }
         }
     }
@@ -772,6 +801,7 @@ public partial class FrmMain : Form
         undoManager.Undo();
         SyncVolumeSlider();
         UpdateUndoMenu();
+        trackManager.MarkMixChanged();
     }
 
     private void menuEditRedo_Click(object sender, EventArgs e)
@@ -779,6 +809,7 @@ public partial class FrmMain : Form
         undoManager.Redo();
         SyncVolumeSlider();
         UpdateUndoMenu();
+        trackManager.MarkMixChanged();
     }
 
     // Normalize: scale the track so its loudest sample reaches full volume (undoable)
@@ -895,6 +926,134 @@ public partial class FrmMain : Form
             return ((float)nudFrequency.Value, (float)nudDuration.Value);
         }
         return null;
+    }
+
+
+    // ---------- Track controls (right-click menu, mute/solo, track height) ----------
+
+    // Small toggle button (M / S) shown in a track's corner
+    private CheckBox MakeTrackToggle(string text, Color onColor, string tip)
+    {
+        CheckBox box = new()
+        {
+            Text = text,
+            Appearance = Appearance.Button,
+            FlatStyle = FlatStyle.Flat,
+            AutoSize = true,
+            Font = new Font("Segoe UI", 8f, FontStyle.Bold),
+            ForeColor = Color.White,
+            BackColor = Color.FromArgb(60, 60, 60),
+            TabStop = false,
+            Anchor = AnchorStyles.Top | AnchorStyles.Right,
+            Cursor = Cursors.Hand
+        };
+        box.FlatAppearance.BorderColor = Color.FromArgb(90, 90, 90);
+        box.FlatAppearance.CheckedBackColor = onColor;
+        box.CheckedChanged += (s, e) => box.ForeColor = box.Checked ? Color.Black : Color.White;
+        trackTips.SetToolTip(box, tip);
+        return box;
+    }
+
+    private void ChangeTrackColor(Track track)
+    {
+        colorDialog.Color = track.TrackColor;
+        colorDialog.FullOpen = true;
+        if (colorDialog.ShowDialog(this) == DialogResult.OK)
+        {
+            track.TrackColor = colorDialog.Color;
+            track.PanDrawSamples.Invalidate();
+        }
+    }
+
+    private void RenameTrack(Track track)
+    {
+        string name = AskText("Rename Track", "Track name:", track.Name);
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            track.Name = name.Trim();
+            track.PanDrawSamples.Invalidate();
+        }
+    }
+
+    private void DuplicateTrack(Track track)
+    {
+        Track copy = track.Duplicate();
+        CreateTrackPanel(copy);                       // gives it the next color and selects it
+        trackManager.InsertTrackAfter(track, copy);   // shows up right below the original
+        UpdateSizes();
+        trackManager.MarkMixChanged();
+    }
+
+    // Deletes a track after asking (used by the Delete key and the right-click menu)
+    private void DeleteTrack(Track track)
+    {
+        if (track is null) return;
+        if (MessageBox.Show(this, $"Delete \"{track.Name}\"? This can't be undone.", "Delete Track",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) != DialogResult.Yes)
+        {
+            return;
+        }
+
+        Panel pan = track.PanDrawSamples;
+        panTracks.Controls.Remove(pan);
+        undoManager.Forget(track);
+        UpdateUndoMenu();
+        trackManager.RemTrack(track);
+        pan.Dispose();
+        track.Dispose();
+        SyncVolumeSlider();
+        UpdateSizes();
+        trackManager.MarkMixChanged();
+    }
+
+    // Small dialog with a text box; returns null if cancelled
+    private string AskText(string title, string label, string initial)
+    {
+        using Form dialog = new Form
+        {
+            Text = title,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            StartPosition = FormStartPosition.CenterParent,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Padding = new Padding(12)
+        };
+        FlowLayoutPanel layout = new() { FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink };
+        Label lbl = new() { Text = label, AutoSize = true };
+        TextBox box = new() { Text = initial, Width = 260 };
+        FlowLayoutPanel buttons = new() { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Margin = new Padding(0, 16, 0, 0) };
+        Button ok = new() { Text = "OK", AutoSize = true, DialogResult = DialogResult.OK };
+        Button cancel = new() { Text = "Cancel", AutoSize = true, DialogResult = DialogResult.Cancel };
+        buttons.Controls.AddRange(new Control[] { ok, cancel });
+        layout.Controls.AddRange(new Control[] { lbl, box, buttons });
+        dialog.Controls.Add(layout);
+        dialog.AcceptButton = ok;
+        dialog.CancelButton = cancel;
+        box.SelectAll();
+        return dialog.ShowDialog(this) == DialogResult.OK ? box.Text : null;
+    }
+
+    // Adds a "View" menu with Track Height options (built in code, no designer needed)
+    private void BuildViewMenu()
+    {
+        ToolStripMenuItem menuView = new("&View");
+        ToolStripMenuItem menuHeight = new("Track Height");
+        (string Text, int Height)[] options = { ("Small", 80), ("Medium", 140), ("Large", 220), ("Fit to Window", 0) };
+        foreach (var option in options)
+        {
+            ToolStripMenuItem item = new(option.Text) { Checked = option.Height == trackHeight };
+            item.Click += (s, e) =>
+            {
+                trackHeight = option.Height;
+                foreach (ToolStripMenuItem other in menuHeight.DropDownItems) other.Checked = other == item;
+                UpdateSizes();
+            };
+            menuHeight.DropDownItems.Add(item);
+        }
+        menuView.DropDownItems.Add(menuHeight);
+        menu.Items.Insert(menu.Items.IndexOf(menuGen) + 1, menuView);   // between Generate and Help
     }
 
     // A Panel that draws off-screen first, so it doesn't flicker when redrawn

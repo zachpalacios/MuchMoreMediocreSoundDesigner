@@ -31,6 +31,8 @@ public class Track : IDisposable
 
     // properties
     public int DrawOffset { get; set; }
+    public bool IsMuted { get; set; }     // silent in the mix, still visible
+    public bool IsSoloed { get; set; }    // when any track is soloed, only soloed tracks play
     public bool IsDisabled { get; private set; }
     public Panel PanDrawSamples { get; private set; }
     public float Volume { get; private set; }
@@ -41,6 +43,7 @@ public class Track : IDisposable
     public int Channels => channels;                             // 1 = mono, 2 = stereo
     public double DurationSeconds => samples.Length / (double)Math.Max(1, sampleRate * channels);
     private static readonly Font LabelFont = new("Segoe UI", 9f, FontStyle.Bold);
+    private long playStartSample;   // where in the audio playback started (for seeking)
     private string tempFilePath => Path.Combine(Path.GetTempPath(), "MediocreSoundDesigner", "temp.wav");
     public PlaybackState State => outputDevice?.PlaybackState ?? PlaybackState.Stopped;
 
@@ -88,6 +91,15 @@ public class Track : IDisposable
     {
         this.sampleRate = sampleRate;
         this.channels = channels;
+    }
+    // An exact copy of this track's audio, volume and shift, as a new track
+    public Track Duplicate()
+    {
+        Track copy = new(CloneSamples(), sampleRate, channels);
+        copy.Name = Name + " (copy)";
+        copy.DrawOffset = DrawOffset;
+        copy.SetVolume(Volume);
+        return copy;
     }
     public void LinkPanels(Panel panDrawSamples, Panel panContainer)
     {
@@ -287,12 +299,21 @@ public class Track : IDisposable
     }
 
     // play
-    public void Play()
+    // Plays from startSample (0 = the beginning)
+    public void Play(long startSample = 0)
     {
         outputDevice?.Dispose();
         fileReader?.Dispose();
         SaveToTempFile();
         fileReader = new AudioFileReader(tempFilePath);
+
+        // start partway in: keep it inside the audio and on a whole frame (so stereo L/R stay aligned)
+        long totalSamples = fileReader.Length / 4;
+        startSample = Math.Clamp(startSample, 0, totalSamples);
+        startSample -= startSample % channels;
+        fileReader.Position = startSample * 4;
+        playStartSample = startSample;
+
         outputDevice = new WaveOut();
         outputDevice.Init(fileReader);
         outputDevice.Play();
@@ -321,7 +342,8 @@ public class Track : IDisposable
     }
     public int GetPlayheadPos()
     {
-        return (int)((outputDevice?.GetPosition() ?? 0) / 4);
+        if (outputDevice is null) return 0;
+        return (int)(playStartSample + outputDevice.GetPosition() / 4);
     }
     public void ToggleDisabled()
     {
@@ -370,7 +392,7 @@ public class Track : IDisposable
         DrawOffset += amount;
         DrawOffset = Math.Max(0, DrawOffset);
     }
-    public void DrawSamples(Graphics g, int drawTimescale)
+    public void DrawSamples(Graphics g, int drawTimescale, bool dimmed = false)
     {
         if (PanDrawSamples is null)
         {
@@ -397,6 +419,7 @@ public class Track : IDisposable
         if (samples != null && samples.Length > 0)
         {
             Color color = IsDisabled ? Settings.Color.TrackSamples_Disabled : TrackColor;
+            if (dimmed) color = Color.FromArgb(80, color);   // muted (or not soloed): faded out
             using Pen pen = new(color);
 
             // One vertical line per pixel, from the lowest to the highest sample in that pixel's slice.
